@@ -95,6 +95,19 @@ v.text.topleft = {
 }
 ```
 
+### [Snippets](./snippets.lua)
+
+A collection of small code snippets that might be often wanted. Or can just serve as an inspiration
+for your own scripts.
+
+Snippets include:
+
+- loading the current directory when swayimg opened with just 1 image
+- printing a status message on every variable change (like it used to be)
+- resizing the image with the window if the image is in not zoomed in
+- cycling fixed scaling and position modes
+- printing shell command output
+
 ### New scaling modes
 
 - `keep_by_xxx`:
@@ -156,8 +169,8 @@ require 'swi.globals'
 
 ### Better dev experience in NeoVim
 
-If you already use _lua_ls_ you only need to load include the original swayimg api definitions from
-which _swi_ reuses the type definitions:
+If you're already using _lua_ls_ you only need to include the original swayimg api definitions from
+which _swi_ reuses the types:
 
 ```lua
 settings.Lua.workspace.library = {'/usr/share/swayimg/swayimg.lua'}
