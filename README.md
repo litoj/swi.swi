@@ -2,20 +2,26 @@
 
 What's up with the name? You tell me:
 
+- _SWayImg_ - just like `imv` is a shorthand of `IMageViewer`
 - shorter and easier to type when accessing the api
 - simple way to say a lua package is made for swayimg - like `.nvim` for neovim
 - _Swayimg neoWim-like Interface_
   - allows vim-style mappings like `<C-S-Del>`, `<C-.>`…
   - eventloop system based on neovim lua autocommands - almost everything is listenable
   - variables are now all 2-way accessible variables, not just setter methods
-- _Superb Wayland Imager_
+- _Superb Wayland Imageviewer_
   - because swayimg is already _the_ waylang imager and this only makes it better
   - because the api is simpler and efficient, yet offers more features and practicality than the
     original
 
-## ✨ Features
+<details>
+<summary>
 
-### Api accessibility
+## ✨ Complete list of Features
+
+</summary>
+
+### 📦 Api accessibility
 
 The whole api can now be set through variables wherever it makes sense.
 
@@ -45,7 +51,7 @@ e.subscribe {
 }
 ```
 
-### Style-agnostic keybinds
+### 🎹 Style-agnostic keybinds
 
 Map as many keys or mouse actions in gui- or vim-style or anything in between
 
@@ -64,15 +70,15 @@ Map a shell command more easily than ever, even marked batches:
   - until we get an alternative dnd mapping for dragging the whole selection
 - `%`: unquoted current (like in 4.x): `v.map('', [[bash -c '$(which trash || echo rm) "%"']])`
 
-### Better exif display in text layer
+### 🖥️ Better exif display in text layer
 
 By default swayimg spits out whatever value exiv2 sees in the exif data, but the format often
 differs between devices and rational number get stored in unconventional formats like `700/10000`.
 They also use long tag names and you have to know in which category to look for them.
 
 No more. Now you can either use `swi.text.format_exif` yourself, or even better - just put the
-desired exif tag in the same template format as the other image values - only requirement is to keep
-the casing.
+desired exif tag in the same template format as the other image values - the only requirement is to
+keep the casing.
 
 Example:
 
@@ -102,7 +108,9 @@ v.text.topleft = {
 True eventloop used by swayimg internally is still inaccessible, so we cannot listen for image
 updates and save image state (like scale, position, etc.) before the image gets changed.
 
-## 🚀 Geting started
+</details>
+
+## 🚀 Geting Started
 
 Clone the repo into your swayimg config to `swi` _(not `swi.swi`!)_.
 
@@ -112,7 +120,7 @@ git clone https://github.com/litoj/swi ~/.config/swayimg/swi
 
 _Don't forget to add it to `.gitignore`, if you version your dotfiles_
 
-### Keep and convert your 4.x INI config
+### 🏠 Keep and convert your 4.x INI config
 
 ```sh
 luajit ~/.config/swayimg/swi/convert.lua > ~/.config/swayimg/init.lua
@@ -132,7 +140,8 @@ require('swi.convert').load()
 ### Use the API
 
 To start using the api you only need to load the main module. However, if you also want to use all
-the main APIs as globals, you can also load `swi.globals` to have easier access to them
+the main APIs as globals, you can also load `swi.globals` to have easier access to them. The
+structure is declared in [types.lua](./types.lua)
 
 ```lua
 -- ~/.config/swayimg/init.lua
@@ -154,6 +163,6 @@ which _swi_ reuses the type definitions:
 settings.Lua.workspace.library = {'/usr/share/swayimg/swayimg.lua'}
 ```
 
-# License
+## License
 
 Do whatever you please.
