@@ -1,0 +1,4 @@
+syntax="LuaJIT"
+quote_style="AutoPreferSingle"
+collapse_simple_statement="Always"
+call_parentheses="None"
