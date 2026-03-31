@@ -51,7 +51,7 @@ local section_map = {
 local opt_translations = {
 	['font.color'] = 't.foreground',
 	['font.name'] = 't.font',
-	['font.size'] = function(x) return 't.size = ' .. (tonumber(x) * 1.5) end,
+	['font.size'] = function(x) return 't.size = ' .. (tonumber(x) * 1.25) end,
 	['info.show'] = 't.enabled', -- boolean
 	['info.info_timeout'] = 't.enabled', -- number
 	['general.position'] = function(x)
@@ -330,6 +330,7 @@ function M.convert(path)
 	local ret = {
 		[[require 'swi.globals'
 require('swi.snippets').print_option_changes()
+t.line_spacing = 0.5
 ]],
 	}
 

@@ -577,7 +577,7 @@ local function text_proxy()
 			-- transform scale factor into a pixel value
 			set = function(val) _s.text.set_spacing(math.floor((val - 1) * (rawget(swi.text, '_size') or 0))) end,
 		},
-		_line_spacing = 1.3,
+		_line_spacing = 1,
 		size = {
 			set = function(val)
 				api.set_size(val)
