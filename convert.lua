@@ -168,8 +168,8 @@ local action_map = {
 			x:match '^[%+%-]?%d+$'
 					and (
 						x:find '^[+-]' --
-							and string.format('%s.get_abs_scale() * %.2f', alias, 1 + (tonumber(x) / 100))
-						or string.format('%.2f', tonumber(x) / 100)
+							and alias .. '.get_abs_scale() * ' .. (1 + tonumber(x) / 100)
+						or '' .. tonumber(x) / 100
 					)
 				or format_value('v.scale', x)
 		)
@@ -192,7 +192,7 @@ local action_map = {
 			x:match '^[%+%-]?%d+$'
 					and (
 						x:find '^[+-]' --
-							and string.format('g.thumb_size * %.2f', 1 + (tonumber(x) / 100))
+							and 'g.thumb_size * ' .. (1 + tonumber(x) / 100)
 						or x
 					)
 				or format_value('g.thumb_size', x)

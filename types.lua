@@ -127,19 +127,19 @@ function swi.set_window_size(width, height) end
 ---@class swi.eventloop
 swi.eventloop = {}
 
----@param f swi.eventloop.filter.opts
-function swi.eventloop.unsubscribe(f) end
+---@param hook swi.eventloop.subscribe.opts
+---@return hook_id id that can be used to remove the hook
+function swi.eventloop.subscribe(hook) end
 
 ---@param f? swi.eventloop.filter.opts
 ---@return table<hook_id,swi.eventloop.subscribe.opts>
 function swi.eventloop.get_subscribed(f) end
 
+---@param f swi.eventloop.filter.opts
+function swi.eventloop.unsubscribe(f) end
+
 ---@param state event_cfg
 function swi.eventloop.trigger(state) end
-
----@param hook swi.eventloop.subscribe.opts
----@return hook_id id that can be used to remove the hook
-function swi.eventloop.subscribe(hook) end
 
 --------------------------------------------------------------------------------
 -- Image list

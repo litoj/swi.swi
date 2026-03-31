@@ -4,20 +4,23 @@ function M.load_dir_if_single()
 	e.subscribe {
 		event = 'SwiEnter',
 		callback = function()
-			if l.size() == 1 then
-				l.adjacent = true
-				l.add(l.get_current().path:match '.+/')
-			end
+			if l.size() == 1 then l.add(l.get_current().path:match '.+/') end
+			return true
 		end,
 	}
 end
 
-function M.print_option_changes()
+function M.print_option_changes(deregister)
+	if deregister then
+		e.unsubscribe { event = 'OptionSet', group = 'change_printer' }
+		return
+	end
+
 	local function register_printer()
 		-- register after base config has been loaded
 		e.subscribe { -- Print messages on option update
 			event = 'OptionSet',
-			pattern = '^swi%.?[^.]*%.[^.]*$', -- all main opts - not the subsubtables (text etc.)
+			pattern = { '!swi.imagelist.size', '^swi%.?[^.]*%.[^.]*$' }, -- all main opts - not the subsubtables (text etc.)
 			group = 'change_printer',
 			callback = function(state)
 				local v = state.data
@@ -41,7 +44,7 @@ function M.print_option_changes()
 		return true
 	end
 
-	if swi.initialized then
+	if rawget(swi, '_initialized') then
 		register_printer()
 	else
 		e.subscribe { event = 'SwiEnter', callback = register_printer }
@@ -65,6 +68,12 @@ function M.print_shell_output()
 	}
 end
 
+function M.cycle_values(values, current)
+	for i, mode in ipairs(values) do
+		if mode == current then return values[i % #values + 1] end
+	end
+end
+
 function M.cycle_scale()
 	local api = swi[swi.mode]
 	local modes = {
@@ -81,12 +90,7 @@ function M.cycle_scale()
 	}
 
 	local current = type(api.scale) == 'string' and api.scale or 'keep'
-	for i, mode in ipairs(modes) do
-		if mode == current then
-			api.scale = modes[i % #modes + 1]
-			break
-		end
-	end
+	api.scale = M.cycle_values(modes, current)
 end
 
 function M.cycle_position()
@@ -104,12 +108,7 @@ function M.cycle_position()
 	}
 
 	local current = type(api.position) == 'string' and api.position or 'center'
-	for i, mode in ipairs(modes) do
-		if mode == current then
-			api.position = modes[i % #modes + 1]
-			break
-		end
-	end
+	api.position = M.cycle_values(modes, current)
 end
 
 return M
