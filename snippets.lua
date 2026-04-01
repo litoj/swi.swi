@@ -1,27 +1,31 @@
 local M = {}
 
 function M.load_dir_if_single()
-	e.subscribe {
-		event = 'SwiEnter',
-		callback = function()
-			if l.size() == 1 then l.add(l.get_current().path:match '.+/') end
-			return true
-		end,
-	}
+	local function check_n_load()
+		local l = swi.imagelist
+		if l.size() == 1 then l.add(l.get_current().path:match '.+/') end
+		return true
+	end
+
+	if swi.initialized then
+		check_n_load()
+	else
+		swi.eventloop.subscribe { event = 'SwiEnter', callback = check_n_load }
+	end
 end
 
 function M.print_option_changes(deregister)
 	if deregister then
-		e.unsubscribe { event = 'OptionSet', group = 'change_printer' }
+		swi.eventloop.unsubscribe { event = 'OptionSet', group = 'print_var_change' }
 		return
 	end
 
 	local function register_printer()
 		-- register after base config has been loaded
-		e.subscribe { -- Print messages on option update
+		swi.eventloop.subscribe { -- Print messages on option update
 			event = 'OptionSet',
 			pattern = { '!swi.imagelist.size', '^swi%.?[^.]*%.[^.]*$' }, -- all main opts - not the subsubtables (text etc.)
-			group = 'change_printer',
+			group = 'print_var_change',
 			callback = function(state)
 				local v = state.data
 				if type(v) == 'number' then
@@ -31,7 +35,7 @@ function M.print_option_changes(deregister)
 				end
 
 				local name = state.match:match '([^.]+%.[^.]+)$'
-				t.set_status(
+				swi.text.set_status(
 					('%s%s: %s'):format(
 						name:sub(1, 1):upper(),
 						name:sub(2):gsub('[_.](.)', function(x) return ' ' .. x:upper() end),
@@ -44,27 +48,20 @@ function M.print_option_changes(deregister)
 		return true
 	end
 
-	if rawget(swi, '_initialized') then
+	if swi.initialized then
 		register_printer()
 	else
-		e.subscribe { event = 'SwiEnter', callback = register_printer }
+		swi.eventloop.subscribe { event = 'SwiEnter', callback = register_printer }
 	end
 end
 
 function M.resize_image_with_window()
-	e.subscribe {
+	swi.eventloop.subscribe {
 		event = 'WinResized',
 		mode = { 'viewer', 'slideshow' },
 		callback = function()
 			if type(v.scale) == 'string' then swayimg.viewer.set_fix_scale(v.scale) end
 		end,
-	}
-end
-
-function M.print_shell_output()
-	e.subscribe {
-		event = 'ShellCmdPost',
-		callback = function(state) t.set_status(state.data.out) end,
 	}
 end
 
@@ -109,6 +106,25 @@ function M.cycle_position()
 
 	local current = type(api.position) == 'string' and api.position or 'center'
 	api.position = M.cycle_values(modes, current)
+end
+
+function M.print_shell_output()
+	swi.eventloop.subscribe {
+		event = 'ShellCmdPost',
+		callback = function(state) swi.text.set_status(state.data.out) end,
+	}
+end
+
+local ts = tostring
+function M.pretty_print_tables()
+	---Debugging helper - print tables as they're defined
+	local tbl = require('swi.utils').tbl_to_str
+
+	---@diagnostic disable-next-line: duplicate-set-field
+	function _G.tostring(x)
+		if type(x) == 'table' then return tbl(x, '') end
+		return ts(x)
+	end
 end
 
 return M

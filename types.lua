@@ -10,18 +10,8 @@
 ---@class proxy
 ---Overrides that handle the behaviour difference between the apis
 ---`['*']` is a general handler used for all I/O when defined (replaces api)
----@field private _overrides {['*']:override?, [string]:override|function}
+---@field protected _overrides {['*']:override?, [string]:override|function}
 local proxy = {}
-
----Add a listener for setting a variable.
----Only reacts to user setting the variable
----@param idx string|'*' name of the variable to listen for getting set ('*' for all)
---- - use `nil` to register for any variable change
----@param cb? fun(val,idx:string):(boolean?) Handler, return true to unregister
---- - pass in `nil` to deregister the hook of given `id`
----@param id string? optional identifier to be able to manually deregister the function
----@return integer|string id
-function proxy.on_set(idx, cb, id) end
 
 --------------------------------------------------------------------------------
 -- Main application class
@@ -53,7 +43,8 @@ swi = {}
 ---Escape sequences:
 --- - `%`: current file unquoted
 --- - `%f`: current file quoted with singlequotes
---- - `%s`/`%m`: all marked files or current file quoted with singlequotes
+--- - `%s`: all marked files or current file quoted with singlequotes
+--- - `%m`: only marked files or don't execute
 --- - `%%`: normal percentage sign (`%`)
 ---@param cmd string
 ---@return string stdout
@@ -84,8 +75,8 @@ function swi.set_window_size(width, height) end
 --- Event loop processing
 
 ---@alias event_name_t
----| "ImgChangePre" # just before selecting a different image, data: old image
 ---| "ImgChange" # after selected image has changed, data: new image
+---| "ImgChangePre" # just before selecting a different image, data: old image
 ---| "OptionSet" # after setting any option in the api, match: opt object path, data: opt value
 ---| "ShellCmdPost" # after swi.exec, data: {[cmd],[out]}
 ---| "ModeChanged" # match: new mode, mode: old mode
@@ -93,7 +84,7 @@ function swi.set_window_size(width, height) end
 ---| "SwiEnter" # just after loading config and initializing imagelist
 ---| "SwiLeavePre" # before exiting swayimg - hooks for given statuscode must deregister to exit
 ---| "Signal" # USR1 or USR2 received by swayimg
----| "NewHook" # when a hook gets subscribed, match: event, data: hook config
+---| "Subscribed" # when a hook gets subscribed, match: event, mode: hook's mode, data: hook config
 ---| "User" # custom user-emitted/triggered signaling
 
 ---@class event_cfg
@@ -112,7 +103,7 @@ function swi.set_window_size(width, height) end
 ---Simple string to match directly, luapat,
 ---or negated simple match ("!plainstr") to forbid that match
 ---@field pattern? string|string[]
----@field callback fun(state:event_state):(boolean?)
+---@field callback fun(ev:event_state):(boolean?)
 
 ---@alias hook_id table
 
@@ -125,6 +116,8 @@ function swi.set_window_size(width, height) end
 
 ---Event loop processor
 ---@class swi.eventloop
+---@field debug_trigger boolean print all triggered events and where they were triggered from
+---@field debug_subscribe boolean print all hook registrations and where they were triggered from
 swi.eventloop = {}
 
 ---@param hook swi.eventloop.subscribe.opts
@@ -223,27 +216,33 @@ function swi.text.is_visible() end
 ---@param status string Status text to show
 function swi.text.set_status(status) end
 
----Nicely format the requested value to human readable rational numbers.
----@param img_meta table<string,string> the `.meta` field of the image
----@param val string name/path of the exif value to get
---- single-word tags resolve to `Exif.Photo.<>`  or `Exif.Image.<>`
----@return string?
-function swi.text.format_exif(img_meta, val) end
-
 --------------------------------------------------------------------------------
 -- Base mode class
 --------------------------------------------------------------------------------
 
+---Extension to create event-based textlayer updates.
+---When triggered, the callback gets evaluated and value set to its position in the text block.
+---@class mode_base.text.dyntext: swi.eventloop.subscribe.opts
+---@field group? nil This eventhook field gets set automatically for auto-deregistration
+---@field callback fun(ev:event_state):(string?) output to set in the text layer
+
+---@alias extended_text_template (text_template_t|mode_base.text.dyntext|fun(img:swayimg.image|swayimg.entry):string)
+
+---A more dynamic approach to updating the text layer.
+--- - custom functions to generate text on image change.
+--- - custom hooks to update the text when an event is triggered.
+---   - for tracking variables just template the varpath: `'Marked: {swi.imagelist.marked.size}'`
+---
 ---In viewer+slideshow mode you can use exif tags directly, like {ExposureTime}
 ---or specify the full exif path (without `meta.` prefix), like {Exif.Fujifilm.Rating}
----`swi.text.format_exif` then automatically formats the values
---- HINT: to see what tags are available: `print(swi.viewer.get_image().meta)`
+---`utils.format_exif` then automatically formats the values.
+---HINT: to see what tags are available: `print(swi.viewer.get_image().meta)`
 ---@see swi.text.format_exif
 ---@class mode_base.text: proxy
----@field topleft text_template_t[] Text layer scheme for top-left corner
----@field topright text_template_t[] Text layer scheme for top-right corner
----@field bottomleft text_template_t[] Text layer scheme for bottom-left corner
----@field bottomright text_template_t[] Text layer scheme for bottom-right corner
+---@field topleft extended_text_template[] Text layer scheme for top-left corner
+---@field topright extended_text_template[] Text layer scheme for top-right corner
+---@field bottomleft extended_text_template[] Text layer scheme for bottom-left corner
+---@field bottomright extended_text_template[] Text layer scheme for bottom-right corner
 
 ---Base class providing text overlay layout fields shared by all display modes.
 ---@class mode_base: proxy
@@ -261,8 +260,8 @@ function mode_base.map(bind, action, desc) end
 function mode_base.unmap(bind) end
 
 ---@class mapping_cfg
----@field fn function the action that runs on the binding activation
----@field src string where was the binding defined
+---@field cb function the action that runs on the binding activation
+---@field trace string where was the binding defined
 ---@field desc? string optional description of the action
 
 ---@return table<string,mapping_cfg> map of the user bindings

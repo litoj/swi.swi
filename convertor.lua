@@ -328,7 +328,7 @@ function M.convert(path)
 	end
 
 	local ret = {
-		[[require 'swi.globals'
+		[[require 'swi.api.globals'
 require('swi.snippets').print_option_changes()
 t.line_spacing = 0.5
 ]],
@@ -389,5 +389,5 @@ function M.save_or_print(out_path, config_path)
 	end
 end
 
-if arg and arg[0] and arg[0]:match 'convert%.lua$' then M.save_or_print(arg[1], arg[2]) end
+if arg and arg[0] and arg[0]:match 'convertor%.lua$' then M.save_or_print(arg[1], arg[2]) end
 return M

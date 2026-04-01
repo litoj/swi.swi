@@ -19,81 +19,66 @@ What's up with the name? You tell me:
 
 ## ✨ Complete list of Features
 
+- All basic features that swayimg should have by default.
+- Focus on extensibility and ease of use. (provides a convertor for old configs - 4.x)
+- Provides all the basic api features that are necessary for creating more complex behaviour.
+
 </summary>
 
-### 📦 Api accessibility
+- options now accessible as variables: `swi.text.size = swi.text.size*1.1`
+- forward compatible: original api is still forwarded through `swi` so all additions are still
+  available and any setter/enabler and getter methods will automatically be accessible as variables,
+  even if not documented
+- common actions as directly mappable functions:
+  ```lua
+  v.map('Right', v.go.next)
+  v.map('k', v.step.up)
+  v.map('Alt+k', function() v.step.by(70,70) end)
+  ```
+- **eventloop**: subscribe to any change in the api and trigger your own events for inter-module
+  messaging
+  - inspired by vim event structure and neovim for registering the hooks
+- text layer templates:
+  - track any api variable: `g.text.topright={'Marked: {swi.imagelist.marked.size}'}`
+  - pretty-print exif data: `v.text.topleft={'Exposure: {ExposureTime}'}`
+  - dynamic event updates - use eventloop hooks to update the text dynamically:
+    ```lua
+    v.text.topleft={
+      {event='User',pattern='mymsg',function(ev)
+        return ev.data and ('Received (multiline?) message: ' .. ev.data)
+      end}
+      [100] = 'Surely the message is shorter than 100 lines and won\'t override this'
+    }
+    ```
+- style-agnostic keybinds: use gui-, imv- or **vim-style** keybinds or any style that's right for
+  you
+  ```lua
+  --        gui,      vim,    imv-gui,  chaos (please don't!)
+  g.map({ 'Shift+m', '<S- >', 'Alt-h',   'C-S+Alt-_' }, function()
+  	l.marked.set_current 'toggle'
+  	g.go.left()
+  end)
+  ```
+- map **shell commands** directly with **ranger-style** file placeholders:
+  - `%f`: `'`-quoted current file: `v.map('Ctrl-e', 'xdg-open %f')`
+  - `%s`/`%m`: `'`-quoted marked/selected files: `v.map('A-s', 'dragon-drop -x -A %s')`
+    - useful mapping until we get an alternativ for dragging all marked files
+    - `%s`: falls back to current file
+    - `%m`: doesn't execute the command if no files were marked
+  - `%`: unquoted current (like in 4.x): `v.map('', [[bash -c '$(which trash || echo rm) "%"']])`
 
-The whole api can now be set through variables wherever it makes sense.
+### New scaling modes
 
-Common actions like switching images and moving around the image have been made into standalone
-functions to make it simpler for mapping:
+- `keep_by_xxx`:
+  - useful for comparing identical images of different sizes
+  - you will stay zoomed into the same spot of the image even if the other image is half the
+    resolution
+  - available metrics: …`width`/`height`/`size` - like `width`/`height`/`optimal` scaling
 
-```lua
-v.map('Right', v.go.next)
-v.step.default_size = 100 -- px
-v.map('k', v.step.up)
-v.map('Alt+k', function() v.step.by(70,70) end)
-```
+### TODOs
 
-### ⚡️ Eventloop
-
-Lets you listen to almost anything and trigger your own events to allow adding extra features that
-need simple ways of communication.
-
-Example: displaying the current number of marked images
-
-```lua
-g.text.topright = { 'Image: {list.index}/{list.total}', 'Marked: 0' }
-e.subscribe {
-	event = 'OptionSet',
-	pattern = 'swi.imagelist.marked.size',
-	callback = function(event) g.text.topright = { g.text.topright[1], 'Marked: ' .. event.data } end,
-}
-```
-
-### 🎹 Style-agnostic keybinds
-
-Map as many keys or mouse actions in gui- or vim-style or anything in between
-
-```lua
---        gui,      vim,    imv-gui,  chaos (please don't!)
-g.map({ 'Shift+m', '<S- >', 'Alt-h',   'C-S+Alt-_' }, function()
-	l.marked.set_current 'toggle'
-	g.go.left()
-end)
-```
-
-Map a shell command more easily than ever, even marked batches:
-
-- `%f`: `'`-quoted current file: `v.map('Ctrl-e', 'xdg-open %f')`
-- `%s`/`%m`: `'`-quoted marked/selected files: `v.map('A-s', 'dragon-drop -x -A %s')`
-  - until we get an alternative dnd mapping for dragging the whole selection
-- `%`: unquoted current (like in 4.x): `v.map('', [[bash -c '$(which trash || echo rm) "%"']])`
-
-### 🖥️ Better exif display in text layer
-
-By default swayimg spits out whatever value exiv2 sees in the exif data, but the format often
-differs between devices and rational number get stored in unconventional formats like `700/10000`.
-They also use long tag names and you have to know in which category to look for them.
-
-No more. Now you can either use `swi.text.format_exif` yourself, or even better - just put the
-desired exif tag in the same template format as the other image values - the only requirement is to
-keep the casing.
-
-Example:
-
-```lua
-v.text.topleft = {
-  'File: {name}', 'Size: {sizehr}', 'Res: {frame.width}x{frame.height}',
-
-  'Exposure: {ExposureTime} s',
-  'ISO: {ISOSpeedRatings}',
-  'DR: {Exif.Fujifilm.DynamicRange}', -- full path
-  'FNumber: {FNumber}',
-  'FL: {FocalLength} mm', -- auto-translates to Exif.Photo.FocalLength
-  'Rating: {Rating}' -- auto-translates to Exif.Image.Rating
-}
-```
+- temporary keybind mode - for multi-key bindings (`gm` etc.)
+- help mode
 
 ### [Snippets](./snippets.lua)
 
@@ -106,20 +91,13 @@ Snippets include:
 - printing a status message on every variable change (like it used to be)
 - resizing the image with the window if the image is in not zoomed in
 - cycling fixed scaling and position modes
-- printing shell command output
-
-### New scaling modes
-
-- `keep_by_xxx`:
-  - useful for comparing identical images of different sizes
-  - you will stay zoomed into the same spot of the image even if the other image is half the
-    resolution
-  - available metrics: …`width`/`height`/`size` - like `width`/`height`/`optimal` scaling
+- notifying on shell command output
+- pretty print tables - replace default tostring() method for better table conversion
 
 ### ⚠️ Limitations
 
-True eventloop used by swayimg internally is still inaccessible, so we cannot listen for image
-updates and save image state (like scale, position, etc.) before the image gets changed.
+True eventloop used by swayimg internally is still inaccessible. That means we cannot listen for
+file updates and save image state (like scale, position, etc.) before the image gets changed.
 
 </details>
 
@@ -136,7 +114,7 @@ _Don't forget to add it to `.gitignore`, if you version your dotfiles_
 ### 🏠 Keep and convert your 4.x INI config
 
 ```sh
-luajit ~/.config/swayimg/swi/convert.lua > ~/.config/swayimg/init.lua
+luajit ~/.config/swayimg/swi/convertor.lua > ~/.config/swayimg/init.lua
 ```
 
 Now you can open them side by side to see how the structure has changed.
@@ -145,9 +123,7 @@ If you want to keep using your old config, you can also load it on startup dynam
 
 ```lua
 -- ~/.config/swayimg/init.lua
-require('swi.convert').load()
-
--- full api now also available
+require('swi.convertor').load()
 ```
 
 ### Use the API
@@ -162,7 +138,7 @@ structure is declared in [types.lua](./types.lua)
 -- you can also just save it to whatever you want
 require 'swi.api'
 -- or through first-letter globals (except: swi.imagelist -> `l` - not `i`)
-require 'swi.globals'
+require 'swi.api.globals'
 
 -- now you can use all options as variables and make intricate behaviour using eventloop hooks
 ```
