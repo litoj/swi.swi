@@ -14,8 +14,9 @@ function M.load_dir_if_single()
 	end
 end
 
-function M.print_option_changes(deregister)
-	if deregister then
+---@param enable boolean? true by default
+function M.print_option_changes(enable)
+	if enable == false then
 		swi.eventloop.unsubscribe { event = 'OptionSet', group = 'print_var_change' }
 		return
 	end
@@ -115,15 +116,12 @@ function M.print_shell_output()
 	}
 end
 
-local ts = tostring
-function M.pretty_print_tables()
-	---Debugging helper - print tables as they're defined
-	local tbl = require('swi.utils').tbl_to_str
-
-	---@diagnostic disable-next-line: duplicate-set-field
-	function _G.tostring(x)
-		if type(x) == 'table' then return tbl(x, '') end
-		return ts(x)
+---@param enable boolean? true by default
+function M.pretty_print_tables(enable)
+	if enable == false then
+		_G.tostring = require('swi.utils').ts
+	else
+		_G.tostring = require('swi.utils').to_pretty_str
 	end
 end
 

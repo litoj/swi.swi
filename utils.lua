@@ -125,6 +125,11 @@ function M.tbl_to_str(t, indent)
 	end
 end
 
+function M.to_pretty_str(x)
+	if type(x) == 'table' then return M.tbl_to_str(x, '') end
+	return M.ts(x)
+end
+
 ---@param action_match string luapat to match the last internal trace to trim
 ---@param stacktrace string use debug.traceback() to get the trace
 function M.pretty_trace(action_match, stacktrace)

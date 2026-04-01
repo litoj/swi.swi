@@ -10,19 +10,6 @@ local M = { text = {} }
 ---@field dynvar {[string]:integer}
 ---@field processed string[]
 
-local function replace_swi_vars(line)
-	if not line then return end
-	for var, path in line:gmatch '({swi%.([a-z0-9._]+)})' do
-		local val = swi
-		for key in path:gmatch '[^.]+' do
-			val = val[key]
-			if val == nil then return end
-		end
-		line = line:gsub(var, tostring(val))
-	end
-	return line
-end
-
 ---@param img swayimg.image|swayimg.entry
 local function replace_exif_vars(line, img)
 	for var, path in line:gmatch '({([A-Z][A-Za-z0-9.]+)})' do
@@ -91,6 +78,30 @@ local function initialize(self, api, name)
 	return tracked
 end
 
+local function generate_var_updater(line, varpaths)
+	local function single_var(ev) return line:gsub(('{%s}'):format(ev.match), U.to_pretty_str(ev.data)) end
+
+	local function multi_var(ev)
+		line = single_var(ev)
+		-- process all other variables
+		for var, path in line:gmatch '({swi%.([a-z0-9._]+)})' do
+			local val = swi
+			for key in path:gmatch '[^.]+' do
+				val = val[key]
+				if val == nil then return end
+			end
+			line = line:gsub(var, U.to_pretty_str(val))
+		end
+		return line
+	end
+
+	return {
+		event = 'OptionSet',
+		pattern = varpaths,
+		callback = #varpaths == 1 and single_var or multi_var,
+	}
+end
+
 ---@param api swayimg_appmode|swayimg.gallery
 ---@param name appmode_t
 ---@return mode_base.text
@@ -112,14 +123,7 @@ function M.new_text(api, name)
 				for path in v:gmatch '{(swi%.[a-z0-9._]+)}' do
 					varpaths[#varpaths + 1] = path
 				end
-				if #varpaths > 1 then
-					local line = v
-					v = {
-						event = 'OptionSet',
-						pattern = varpaths,
-						callback = function(_) return replace_swi_vars(line) end,
-					}
-				end
+				if #varpaths > 1 then v = generate_var_updater(v, varpaths) end
 			end
 
 			if type(v) == 'table' then
