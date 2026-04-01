@@ -4,7 +4,11 @@ local e = require 'swi.api.eventloop'
 
 ---@type swi
 ---@diagnostic disable-next-line: missing-fields
-local M = { _api = swayimg, _path = 'swi', _overrides = {}, initialized = false }
+local M = { _api = swayimg, _path = 'swi', initialized = false }
+
+M.eventloop = e
+M.imagelist = require 'swi.api.imagelist'
+M.text = require 'swi.api.text'
 
 do
 	local viewer_proxy = require('swi.api.viewer').new
@@ -14,14 +18,16 @@ end
 
 do
 	local api = swayimg.gallery
-	local g = { _api = api, _overrides = {} }
-	g._overrides.cache_limit = { set = function(self, x) self._api.limit_cache(x) end }
+	local g = { _api = api }
+
 	g.go = setmetatable({}, {
 		__index = function(tbl, idx)
 			tbl[idx] = function() api.switch_image(idx) end
 			return tbl[idx]
 		end,
 	})
+
+	g._overrides = { cache_limit = { set = function(self, x) self._api.limit_cache(x) end } }
 
 	e.subscribe { -- ad-hoc registering for when user wants to subscribe
 		event = 'Subscribed',
@@ -37,18 +43,6 @@ do
 
 	M.gallery = require('swi.api.mode_base').new(g, 'gallery')
 end
-
-M.imagelist = require 'swi.api.imagelist'
-M.text = require 'swi.api.text'
-M.eventloop = e
-
-M._overrides.mode = {
-	set = function(self, v)
-		local m = self._api.get_mode()
-		self._api.set_mode(v)
-		e.trigger { event = 'ModeChanged', mode = m, match = v }
-	end,
-}
 
 function M.exit(code)
 	local ev = { event = 'SwiLeavePre', match = tostring(code), data = code }
@@ -90,6 +84,16 @@ function M.exec(cmd)
 	p:close()
 	e.trigger { event = 'ShellCmdPost', data = { cmd = cmd, out = out } }
 end
+
+M._overrides = {
+	mode = {
+		set = function(self, v)
+			local m = self._api.get_mode()
+			self._api.set_mode(v)
+			e.trigger { event = 'ModeChanged', mode = m, match = v }
+		end,
+	},
+}
 
 swayimg.on_window_resize(function()
 	local ws = swayimg.get_window_size()

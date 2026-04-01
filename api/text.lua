@@ -1,8 +1,10 @@
+---@diagnostic disable: invisible
 ---@class swi.api.text: swi.text
 local M = { _api = swayimg.text, _path = 'swi.text', _line_spacing = 1, _size = 15 }
 
 M.is_visible = swayimg.text.visible
 
+---@param self swi.text
 local function set_enabled(self, val)
 	if val == true then
 		self._api.show()

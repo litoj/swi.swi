@@ -95,6 +95,14 @@ function M.new(api_name)
 	---@diagnostic disable-next-line: missing-fields
 	local self = { _api = api, _default_scale = 'optimal', _last = false } ---@type swi.api.viewer
 
+	self.get_abs_scale = api.get_scale
+	self.go = M.new_go(api)
+	self.step = M.new_step(self)
+	self.scale_centered = function(s, x, y)
+		api.set_abs_scale(s, x, y)
+		rawset(self, '_scale', s)
+	end
+
 	self._overrides = {
 		default_scale = { set = M.set_default_scale },
 		scale = { set = M.set_scale, get = M.get_scale },
@@ -126,14 +134,6 @@ function M.new(api_name)
 		api.set_abs_scale(api.get_scale() * f, 0, 0)
 		api.set_abs_position(last.x, last.y)
 	end)
-
-	self.get_abs_scale = api.get_scale
-	self.go = M.new_go(api)
-	self.step = M.new_step(self)
-	self.scale_centered = function(s, x, y)
-		api.set_abs_scale(s, x, y)
-		rawset(self, '_scale', s)
-	end
 
 	return mode_base.new(self, api_name)
 end
