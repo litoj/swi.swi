@@ -101,7 +101,5 @@ swayimg.on_window_resize(function()
 	end
 end)
 
-require('swi.snippets').pretty_print_tables()
-
 _G.swi = M
 return proxy.new(M)

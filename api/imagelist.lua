@@ -1,4 +1,3 @@
-local proxy = require 'swi.api.proxy'
 local e = require 'swi.api.eventloop'
 
 local api = swayimg.imagelist
@@ -76,4 +75,4 @@ function M.add(x, silent)
 	if not silent then e.trigger { event = 'OptionSet', match = 'swi.imagelist.size', data = last_lsize } end
 end
 
-return proxy.new(M)
+return require('swi.api.proxy').new(M)

@@ -135,11 +135,11 @@ end
 function M.pretty_trace(action_match, stacktrace)
 	return stacktrace
 		:gsub(': in main chunk.*$', '') -- trim all calls past the main trace
-		:gsub('^.-' .. action_match .. "'", '')
+		:gsub('^.-' .. action_match .. "'\n", '') -- trim interals up to traced fn
 		:gsub('[^\n]+proxy[^\n]+\n', '') -- trim all proxy calls
-		:gsub('[^\n]+/swayimg/', '')
-		:gsub("in function '*([^%s']+)'?", '%1()')
-		:gsub('\n%s+%[C%][^\n]+', '')
+		:gsub('[^\n<"]+/swayimg/', '') -- trim path to config dir
+		:gsub("in function '*([^%s']+)'?", '%1()') -- format as a fn call
+		:gsub('\n%s+%[C%][^\n]+', '') -- trim [C] calls
 end
 
 return M

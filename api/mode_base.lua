@@ -9,8 +9,6 @@ local M = {}
 ---@class swi.api.mode_base.text: mode_base.text
 ---@field _api swayimg_appmode|swayimg.gallery
 ---@field _api_name appmode_t
-local text = {}
-M.text = text
 
 ---@class mode_base.text.tracker
 ---@field [integer] extended_text_template
@@ -37,7 +35,7 @@ end
 
 ---@param tracker mode_base.text.tracker
 ---@param img swayimg.image|swayimg.entry
-function text.render_on_img(tracker, api, placement, img)
+local function render_on_img(tracker, api, placement, img)
 	local p = tracker.processed
 	for i, line in pairs(tracker) do
 		if type(i) == 'number' then
@@ -52,31 +50,32 @@ function text.render_on_img(tracker, api, placement, img)
 end
 
 local primed
-function text.initialize(self)
+---@param self swi.api.mode_base.text
+local function initialize(self)
 	local tracked = {}
 	rawset(self, 'tracked', tracked)
 
 	local function on_change(ev)
 		if not next(tracked) then return end
 		for placement, config in pairs(tracked) do
-			text.render_on_img(config, self._api, placement, ev.data)
+			render_on_img(config, self._api, placement, ev.data)
 		end
 	end
 
-	if not primed then -- ensure we don't try to render before app has initialized
-		if not swi.initialized then
-			primed = M.render_on_img
-			M.render_on_img = function() end
-			e.subscribe {
-				event = 'SwiEnter',
-				callback = function()
-					M.render_on_img = primed
-					on_change { data = U.lazy(self._api.get_image) }
-				end,
-			}
-		else
-			primed = true
+	if not swi.initialized then -- ensure we don't try to render before app has initialized
+		if not primed then
+			primed = render_on_img
+			render_on_img = function() end
 		end
+
+		e.subscribe {
+			event = 'SwiEnter',
+			callback = function()
+				render_on_img = primed
+				on_change { data = U.lazy(self._api.get_image) }
+				return true
+			end,
+		}
 	end
 
 	e.subscribe { event = 'ImgChange', mode = self._api_name, callback = on_change }
@@ -107,8 +106,9 @@ local function generate_var_updater(line, varpaths)
 	}
 end
 
+---@param self swi.api.mode_base.text
 ---@param placement block_position_t
-function text.set(self, x, placement)
+local function set_text(self, x, placement)
 	local group = ('%s.dyntext.%s'):format(self._api_name, placement)
 
 	local tracked = rawget(self, 'tracked') ---@type {[block_position_t]:mode_base.text.tracker}
@@ -146,32 +146,28 @@ function text.set(self, x, placement)
 	end
 
 	if next(new_tr) or has_hooks then
-		if not tracked then tracked = text.initialize(self) end
+		if not tracked then tracked = initialize(self) end
 
 		new_tr.processed = processed
 		tracked[placement] = new_tr
-		text.render_on_img(new_tr, self._api, placement, U.lazy(self._api.get_image))
+		render_on_img(new_tr, self._api, placement, U.lazy(self._api.get_image))
 	else
 		if tracked then tracked[placement] = nil end
 		self._api.set_text(placement, x)
 	end
 end
 
-function text.get(self, idx) return rawget(self, '_' .. idx) end
-
 ---@param api swayimg_appmode|swayimg.gallery
 ---@param name appmode_t
 ---@return mode_base.text
-function text.new(api, name)
+local function new_text(api, name)
 	return proxy.new {
 		_path = ('swi.%s.text'):format(name),
 		_api_name = name,
 		_api = api,
-		_overrides = { ['*'] = { set = text.set, get = text.get } },
+		_overrides = { ['*'] = { set = set_text, get = function(self, idx) return rawget(self, '_' .. idx) end } },
 	}
 end
-
-local function dummy() end
 
 ---@param self mode_base
 ---@param api_name appmode_t
@@ -179,7 +175,7 @@ function M.new(self, api_name)
 	local api = self._api
 	self._path = 'swi.' .. api_name
 	for _, sig in ipairs { 'USR1', 'USR2' } do
-		self._api.on_signal(sig, function() e.trigger { event = 'Signal', match = sig } end)
+		api.on_signal(sig, function() e.trigger { event = 'Signal', match = sig } end)
 	end
 
 	local mappings = {}
@@ -191,7 +187,7 @@ function M.new(self, api_name)
 		end
 	end
 
-	self.text = text.new(api, api_name)
+	self.text = new_text(api, api_name)
 	self.map = function(b, action, desc)
 		local mapcfg = {
 			cb = action,
@@ -225,7 +221,7 @@ function M.new(self, api_name)
 	self.unmap = function(b)
 		b = U.transform_key(b)
 		mappings[b] = nil
-		setmap(b, dummy)
+		setmap(b, function() end)
 	end
 
 	return proxy.new(self)
