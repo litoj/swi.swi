@@ -1,11 +1,12 @@
 local proxy = require 'swi.api.proxy'
 local e = require 'swi.api.eventloop'
 
+local api = swayimg.imagelist
+
 ---@type swi.imagelist
 ---@diagnostic disable-next-line: missing-fields
-local M = { _overrides = {}, marked = {} }
+local M = { _api = api, _path = 'swi.imagelist', _overrides = {}, marked = {} }
 
-local api = swayimg.imagelist
 local mlist = {}
 local msize = 0
 
@@ -75,4 +76,4 @@ function M.add(x, silent)
 	if not silent then e.trigger { event = 'OptionSet', match = 'swi.imagelist.size', data = last_lsize } end
 end
 
-return proxy('swi.imagelist', api, M)
+return proxy.new(M)

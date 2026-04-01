@@ -1,9 +1,16 @@
+---@diagnostic disable: invisible
 local U = require 'swi.utils'
 local proxy = require 'swi.api.proxy'
 local e = require 'swi.api.eventloop'
 
----@class swi.api.mode_base
-local M = { text = {} }
+---@class swi.api.mode_base: mode_base
+---@field _api swayimg_appmode
+local M = {}
+---@class swi.api.mode_base.text: mode_base.text
+---@field _api swayimg_appmode|swayimg.gallery
+---@field _api_name appmode_t
+local text = {}
+M.text = text
 
 ---@class mode_base.text.tracker
 ---@field [integer] extended_text_template
@@ -30,7 +37,7 @@ end
 
 ---@param tracker mode_base.text.tracker
 ---@param img swayimg.image|swayimg.entry
-function M.render_on_img(tracker, api, placement, img)
+function text.render_on_img(tracker, api, placement, img)
 	local p = tracker.processed
 	for i, line in pairs(tracker) do
 		if type(i) == 'number' then
@@ -45,16 +52,14 @@ function M.render_on_img(tracker, api, placement, img)
 end
 
 local primed
----@param name appmode_t
-local function initialize(self, api, name)
+function text.initialize(self)
 	local tracked = {}
 	rawset(self, 'tracked', tracked)
 
 	local function on_change(ev)
-		print 'imgchange'
 		if not next(tracked) then return end
 		for placement, config in pairs(tracked) do
-			M.render_on_img(config, api, placement, ev.data)
+			text.render_on_img(config, self._api, placement, ev.data)
 		end
 	end
 
@@ -66,7 +71,7 @@ local function initialize(self, api, name)
 				event = 'SwiEnter',
 				callback = function()
 					M.render_on_img = primed
-					on_change { data = U.lazy(api.get_image) }
+					on_change { data = U.lazy(self._api.get_image) }
 				end,
 			}
 		else
@@ -74,7 +79,7 @@ local function initialize(self, api, name)
 		end
 	end
 
-	e.subscribe { event = 'ImgChange', mode = name, callback = on_change }
+	e.subscribe { event = 'ImgChange', mode = self._api_name, callback = on_change }
 	return tracked
 end
 
@@ -102,71 +107,79 @@ local function generate_var_updater(line, varpaths)
 	}
 end
 
+---@param placement block_position_t
+function text.set(self, x, placement)
+	local group = ('%s.dyntext.%s'):format(self._api_name, placement)
+
+	local tracked = rawget(self, 'tracked') ---@type {[block_position_t]:mode_base.text.tracker}
+	if tracked and tracked[placement] then e.unsubscribe { group = group } end
+
+	local new_tr = {}
+	local processed = {}
+	local has_hooks = false
+	for i, v in pairs(x) do -- find all custom templates
+		if type(v) == 'string' then
+			local varpaths = {}
+			for path in v:gmatch '{(swi%.[a-z0-9._]+)}' do
+				varpaths[#varpaths + 1] = path
+			end
+			if #varpaths > 1 then v = generate_var_updater(v, varpaths) end
+		end
+
+		if type(v) == 'table' then
+			has_hooks = true
+
+			local hook = v.callback
+			v.callback = function(...)
+				render_hook(processed, i, hook, ...)
+				self._api.set_text(placement, processed)
+			end
+			v.group = group
+			e.subscribe(v)
+
+			processed[i] = v.callback() -- load the default value
+		elseif type(v) == 'function' or v:find '{[A-Z]' then
+			new_tr[i] = v
+		else
+			processed[i] = v
+		end
+	end
+
+	if next(new_tr) or has_hooks then
+		if not tracked then tracked = text.initialize(self) end
+
+		new_tr.processed = processed
+		tracked[placement] = new_tr
+		text.render_on_img(new_tr, self._api, placement, U.lazy(self._api.get_image))
+	else
+		if tracked then tracked[placement] = nil end
+		self._api.set_text(placement, x)
+	end
+end
+
+function text.get(self, idx) return rawget(self, '_' .. idx) end
+
 ---@param api swayimg_appmode|swayimg.gallery
 ---@param name appmode_t
 ---@return mode_base.text
-function M.new_text(api, name)
-	---@param self mode_base.text
-	---@param placement block_position_t
-	local function set_text(x, self, placement)
-		local group = ('%s.dyntext.%s'):format(name, placement)
-
-		local tracked = rawget(self, 'tracked') ---@type {[block_position_t]:mode_base.text.tracker}
-		if tracked and tracked[placement] then e.unsubscribe { group = group } end
-
-		local new_tr = {}
-		local processed = {}
-		local has_hooks = false
-		for i, v in pairs(x) do -- find all custom templates
-			if type(v) == 'string' then
-				local varpaths = {}
-				for path in v:gmatch '{(swi%.[a-z0-9._]+)}' do
-					varpaths[#varpaths + 1] = path
-				end
-				if #varpaths > 1 then v = generate_var_updater(v, varpaths) end
-			end
-
-			if type(v) == 'table' then
-				has_hooks = true
-
-				local hook = v.callback
-				v.callback = function(...)
-					render_hook(processed, i, hook, ...)
-					api.set_text(placement, processed)
-				end
-				v.group = group
-				e.subscribe(v)
-
-				processed[i] = v.callback() -- load the default value
-			elseif type(v) == 'function' or v:find '{[A-Z]' then
-				new_tr[i] = v
-			else
-				processed[i] = v
-			end
-		end
-
-		if next(new_tr) or has_hooks then
-			if not tracked then tracked = initialize(self, api, name) end
-
-			new_tr.processed = processed
-			tracked[placement] = new_tr
-			M.render_on_img(new_tr, api, placement, U.lazy(api.get_image))
-		else
-			if tracked then tracked[placement] = nil end
-			api.set_text(placement, x)
-		end
-	end
-	return proxy(('swi.%s.text'):format(name), {}, { ['*'] = { set = set_text } })
+function text.new(api, name)
+	return proxy.new {
+		_path = ('swi.%s.text'):format(name),
+		_api_name = name,
+		_api = api,
+		_overrides = { ['*'] = { set = text.set, get = text.get } },
+	}
 end
 
 local function dummy() end
 
----@param api swayimg_appmode|swayimg.gallery
----@param name appmode_t
-function M.new_overrides(api, name)
-	-- Emitted rarely, so there's no performance penalty for always registering it
+---@param self mode_base
+---@param api_name appmode_t
+function M.new(self, api_name)
+	local api = self._api
+	self._path = 'swi.' .. api_name
 	for _, sig in ipairs { 'USR1', 'USR2' } do
-		api.on_signal(sig, function() e.trigger { event = 'Signal', match = sig } end)
+		self._api.on_signal(sig, function() e.trigger { event = 'Signal', match = sig } end)
 	end
 
 	local mappings = {}
@@ -177,46 +190,45 @@ function M.new_overrides(api, name)
 			api.on_key(b, action)
 		end
 	end
-	return {
-		text = M.new_text(api, name),
-		map = function(b, action, desc)
-			local mapcfg = {
-				cb = action,
-				desc = desc,
-				trace = debug.traceback(),
-			}
 
-			if type(action) == 'string' then
-				local cmd = action
-				action = function() swi.exec(cmd) end
-			end
+	self.text = text.new(api, api_name)
+	self.map = function(b, action, desc)
+		local mapcfg = {
+			cb = action,
+			desc = desc,
+			trace = debug.traceback(),
+		}
 
-			---@diagnostic disable-next-line: redefined-local
-			for _, b in ipairs(type(b) == 'table' and b or { b }) do
-				b = U.transform_key(b)
+		if type(action) == 'string' then
+			local cmd = action
+			action = function() swi.exec(cmd) end
+		end
 
-				if mappings[b] then error(('%s.map("%s") already set'):format(name, b)) end
-				mappings[b] = mapcfg
-				setmap(b, action)
-			end
-		end,
-
-		get_mappings = function()
-			for _, v in pairs(mappings) do
-				if not v.traced then
-					v.trace = U.pretty_trace('mode_base[^\n]-map', v.trace)
-					v.traced = true
-				end
-			end
-			return mappings
-		end,
-
-		unmap = function(b)
+		---@diagnostic disable-next-line: redefined-local
+		for _, b in ipairs(type(b) == 'table' and b or { b }) do
 			b = U.transform_key(b)
-			mappings[b] = nil
-			setmap(b, dummy)
-		end,
-	}
+
+			if mappings[b] then error(('%s.map("%s") already set'):format(api_name, b)) end
+			mappings[b] = mapcfg
+			setmap(b, action)
+		end
+	end
+	self.get_mappings = function()
+		for _, v in pairs(mappings) do
+			if not v.traced then
+				v.trace = U.pretty_trace('mode_base[^\n]-map', v.trace)
+				v.traced = true
+			end
+		end
+		return mappings
+	end
+	self.unmap = function(b)
+		b = U.transform_key(b)
+		mappings[b] = nil
+		setmap(b, dummy)
+	end
+
+	return proxy.new(self)
 end
 
 return M

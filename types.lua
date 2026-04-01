@@ -4,14 +4,15 @@
 
 ---@class override
 ---@field get? fun(self:proxy,idx:string):(unknown)
----@field set? fun(val:unknown,self:proxy,idx:string)
+---@field set? fun(self:proxy,val:unknown,idx:string)
 
 ---Api conversion provider
 ---@class proxy
 ---Overrides that handle the behaviour difference between the apis
 ---`['*']` is a general handler used for all I/O when defined (replaces api)
----@field protected _overrides {['*']:override?, [string]:override|function}
-local proxy = {}
+---@field protected _overrides {['*']:override?, [string]:override}
+---@field protected _path string object path to this new api (swi.xxx)
+---@field protected _api table the api that we are replacing and redirecting calls to
 
 --------------------------------------------------------------------------------
 -- Main application class
@@ -237,7 +238,6 @@ function swi.text.set_status(status) end
 ---or specify the full exif path (without `meta.` prefix), like {Exif.Fujifilm.Rating}
 ---`utils.format_exif` then automatically formats the values.
 ---HINT: to see what tags are available: `print(swi.viewer.get_image().meta)`
----@see swi.text.format_exif
 ---@class mode_base.text: proxy
 ---@field topleft extended_text_template[] Text layer scheme for top-left corner
 ---@field topright extended_text_template[] Text layer scheme for top-right corner

@@ -1,9 +1,10 @@
+---@diagnostic disable: invisible
 local proxy = require 'swi.api.proxy'
 local e = require 'swi.api.eventloop'
 
 ---@type swi
 ---@diagnostic disable-next-line: missing-fields
-local M = { _overrides = {}, initialized = false }
+local M = { _api = swayimg, _path = 'swi', _overrides = {}, initialized = false }
 
 do
 	local viewer_proxy = require('swi.api.viewer').new
@@ -12,73 +13,39 @@ do
 end
 
 do
-	local gallery_api = swayimg.gallery
-	local g = { _overrides = require('swi.api.mode_base').new_overrides(gallery_api, 'gallery') }
-	g._overrides.cache_limit = { set = gallery_api.limit_cache }
+	local api = swayimg.gallery
+	local g = { _api = api, _overrides = {} }
+	g._overrides.cache_limit = { set = function(self, x) self._api.limit_cache(x) end }
 	g.go = setmetatable({}, {
 		__index = function(tbl, idx)
-			tbl[idx] = function() gallery_api.switch_image(idx) end
+			tbl[idx] = function() api.switch_image(idx) end
 			return tbl[idx]
 		end,
 	})
-	M.gallery = proxy('swi.gallery', gallery_api, g)
 
 	e.subscribe { -- ad-hoc registering for when user wants to subscribe
 		event = 'Subscribed',
 		mode = 'gallery',
 		pattern = 'ImgChange',
 		callback = function()
-			gallery_api.on_image_change(
-				function() e.trigger { event = 'ImgChange', mode = 'gallery', data = gallery_api.get_image() } end
+			api.on_image_change(
+				function() e.trigger { event = 'ImgChange', mode = 'gallery', data = api.get_image() } end
 			)
 			return true
 		end,
 	}
+
+	M.gallery = require('swi.api.mode_base').new(g, 'gallery')
 end
 
 M.imagelist = require 'swi.api.imagelist'
-
-do
-	local text_api = swayimg.text
-	M.text = proxy('swi.text', text_api, {
-		enabled = {
-			set = function(val)
-				if val == true then
-					text_api.show()
-					text_api.set_timeout(0)
-				elseif val == false then
-					text_api.hide()
-				else
-					text_api.set_timeout(val)
-				end
-			end,
-		},
-		is_visible = text_api.visible,
-
-		_line_spacing = 1,
-		line_spacing = {
-			-- transform scale factor into a pixel value
-			set = function(val, self) text_api.set_spacing(math.floor((val - 1) * self._size)) end,
-		},
-		_size = 15,
-		size = {
-			set = function(val, self)
-				text_api.set_size(val)
-
-				-- update line spacing
-				rawset(self, '_size', val)
-				self.line_spacing = self.line_spacing
-			end,
-		},
-	})
-end
-
+M.text = require 'swi.api.text'
 M.eventloop = e
----@diagnostic disable-next-line: invisible
+
 M._overrides.mode = {
-	set = function(v)
-		local m = swayimg.get_mode()
-		swayimg.set_mode(v)
+	set = function(self, v)
+		local m = self._api.get_mode()
+		self._api.set_mode(v)
 		e.trigger { event = 'ModeChanged', mode = m, match = v }
 	end,
 }
@@ -126,15 +93,15 @@ end
 
 swayimg.on_window_resize(function()
 	local ws = swayimg.get_window_size()
-	local ows = rawget(swi, '_window_size')
+	local ows = rawget(M, '_window_size')
 	if not ows or ows.width ~= ws.width or ows.height ~= ws.height then
 		-- TODO: find a way to distinguish focus events from resizing (both can happen at once)
 		e.trigger { event = 'WinResized', data = ws }
-		rawset(swi, '_window_size', ws)
+		rawset(M, '_window_size', ws)
 	end
 end)
 
----@type swi
-_G.swi = proxy('swi', swayimg, M)
+require('swi.snippets').pretty_print_tables()
 
-return M
+_G.swi = M
+return proxy.new(M)
