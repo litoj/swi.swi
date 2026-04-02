@@ -27,9 +27,16 @@ end
 local function render_hook(processed, i, hook, ...)
 	local out = hook(...)
 	if not out then return end
-	for line in out:gmatch '[^\n]+' do
-		processed[i] = line
-		i = i + 1
+	if type(out) == 'table' then
+		for _, line in ipairs(out) do
+			processed[i] = line
+			i = i + 1
+		end
+	else
+		for line in out:gmatch '[^\n]+' do
+			processed[i] = line
+			i = i + 1
+		end
 	end
 end
 

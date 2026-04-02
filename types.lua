@@ -225,7 +225,7 @@ function swi.text.set_status(status) end
 ---When triggered, the callback gets evaluated and value set to its position in the text block.
 ---@class mode_base.text.dyntext: swi.eventloop.subscribe.opts
 ---@field group? nil This eventhook field gets set automatically for auto-deregistration
----@field callback fun(ev:event_state):(string?) output to set in the text layer
+---@field callback fun(ev:event_state):(string|string[]?) output to set in the text layer
 
 ---@alias extended_text_template (text_template_t|mode_base.text.dyntext|fun(img:swayimg.image|swayimg.entry):string)
 
