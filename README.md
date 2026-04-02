@@ -45,7 +45,13 @@ What's up with the name? You tell me:
     ```lua
     v.text.topleft={
       {event='User',pattern='mymsg',function(ev)
-        return ev.data and ('Received (multiline?) message: ' .. ev.data)
+        if not ev then return 'Ready to receive messages' end
+        if type(ev.data) == 'table' then
+          ev.data[1] = 'Received multiline:\t'..ev.data[1]
+          return ev.data
+        else
+          return ev.data and ('Received multiline:\t' .. ev.data)
+        end
       end}
       [100] = 'Surely the message is shorter than 100 lines and won\'t override this'
     }

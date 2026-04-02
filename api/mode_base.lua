@@ -26,17 +26,13 @@ end
 
 local function render_hook(processed, i, hook, ...)
 	local out = hook(...)
-	if not out then return end
 	if type(out) == 'table' then
-		for _, line in ipairs(out) do
-			processed[i] = line
-			i = i + 1
+		i = i - 1
+		for j, line in pairs(out) do
+			processed[i + j] = line
 		end
-	else
-		for line in out:gmatch '[^\n]+' do
-			processed[i] = line
-			i = i + 1
-		end
+	elseif out then
+		processed[i] = out
 	end
 end
 
@@ -90,26 +86,28 @@ local function initialize(self)
 end
 
 local function generate_var_updater(line, varpaths)
-	local function single_var(ev) return line:gsub(('{%s}'):format(ev.match), U.to_pretty_str(ev.data)) end
-
-	local function multi_var(ev)
-		line = single_var(ev)
-		-- process all other variables
-		for var, path in line:gmatch '({swi%.([a-z0-9._]+)})' do
-			local val = swi
-			for key in path:gmatch '[^.]+' do
-				val = val[key]
-				if val == nil then return end
-			end
-			line = line:gsub(var, U.to_pretty_str(val))
-		end
-		return line
-	end
-
-	return {
+	return { -- TODO: possible optimization by rendering only when mode and text are active + on modechange
 		event = 'OptionSet',
 		pattern = varpaths,
-		callback = #varpaths == 1 and single_var or multi_var,
+		callback = function(ev)
+			local line = line
+			if ev then
+				line = line:gsub(('{%s}'):format(ev.match), U.to_pretty_str(ev.data))
+				if not line or #varpaths == 1 then return line end
+			end
+
+			-- process all other variables
+			for var, path in line:gmatch '({swi%.([a-z0-9._]+)})' do
+				local val = swi
+				for key in path:gmatch '[^.]+' do
+					val = val[key]
+					if type(val) == 'function' then val = val() end
+					if val == nil then return end
+				end
+				line = line:gsub(var, U.to_pretty_str(val))
+			end
+			return line
+		end,
 	}
 end
 
@@ -130,7 +128,7 @@ local function set_text(self, x, placement)
 			for path in v:gmatch '{(swi%.[a-z0-9._]+)}' do
 				varpaths[#varpaths + 1] = path
 			end
-			if #varpaths > 1 then v = generate_var_updater(v, varpaths) end
+			if #varpaths > 0 then v = generate_var_updater(v, varpaths) end
 		end
 
 		if type(v) == 'table' then
@@ -144,7 +142,8 @@ local function set_text(self, x, placement)
 			v.group = group
 			e.subscribe(v)
 
-			processed[i] = v.callback() -- load the default value
+			-- load the default value
+			render_hook(processed, i, v.callback, nil)
 		elseif type(v) == 'function' or v:find '{[A-Z]' then
 			new_tr[i] = v
 		else

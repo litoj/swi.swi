@@ -225,9 +225,16 @@ function swi.text.set_status(status) end
 ---When triggered, the callback gets evaluated and value set to its position in the text block.
 ---@class mode_base.text.dyntext: swi.eventloop.subscribe.opts
 ---@field group? nil This eventhook field gets set automatically for auto-deregistration
----@field callback fun(ev:event_state):(string|string[]?) output to set in the text layer
+---Generator of the text to be displayed.
+---NOTE: An initial call call without args is made to get the initial value of the text.
+---@field callback fun(ev:event_state|nil):(string|string[]?)
 
----@alias extended_text_template (text_template_t|mode_base.text.dyntext|fun(img:swayimg.image|swayimg.entry):string)
+---Extended text layer functionality for setting dynamic text values.
+---Multiline generators should remember the size of their previous output to reset the lines to ''
+---@alias extended_text_template
+---| text_template_t basic single-line template string
+---| mode_base.text.dyntext event-based generator
+---| fun(img:swayimg.image|swayimg.entry):(string|string[]?) generator for ImgChange event
 
 ---A more dynamic approach to updating the text layer.
 --- - custom functions to generate text on image change.
