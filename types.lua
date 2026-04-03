@@ -4,15 +4,19 @@
 
 ---@class override
 ---@field get? fun(self:proxy,idx:string):(unknown)
----@field set? fun(self:proxy,val:unknown,idx:string)
+---What should happen when setting a field.
+---Return boolean to indicate manual update of the backing field ('_'..idx) to prevent override.
+---Return `false` to end execution and not trigger an OptionSet event
+---@field set? fun(self:proxy,val:unknown,idx:string):(boolean?)
 
 ---Api conversion provider
 ---@class proxy
 ---Overrides that handle the behaviour difference between the apis
 ---`['*']` is a general handler used for all I/O when defined (replaces api)
 ---@field protected _overrides {['*']:override?, [string]:override}
----@field protected _path string object path to this new api (swi.xxx)
+---@field protected _path string object path to this new api (swi.xxx) or just a name for errors
 ---@field protected _api table the api that we are replacing and redirecting calls to
+---@field protected _trigger boolean trigger events on setting a field (default: true)
 
 --------------------------------------------------------------------------------
 -- Main application class
@@ -21,7 +25,6 @@
 ---Main application class.
 ---@class swi: proxy
 ---@field mode appmode_t Which mode is the application in
----@field title string Window title text
 ---@field antialiasing boolean Enable/disable antialiasing
 ---@field exif_orientation boolean Enable or disable changing orientation based on EXIF
 ---Enable or disable window decoration (title, border, buttons).
@@ -34,11 +37,13 @@
 ---Sway and Hyprland compositors only.
 ---By default enabled in Sway and disabled in other compositors.
 ---@field overlay boolean
+---@field fullscreen boolean set to `nil` to toggle
 ---Set mouse button used for drag-and-drop image file to external apps. (`MouseRight` etc.)
 ---Configurable only at startup.
 ---@field dnd_button string
 ---@field initialized boolean Whether initialization has completed and config has been loaded
-swi = {}
+---@field [appmode_t] mode_base
+_G.swi = {}
 
 ---Execute a shell command in sync.
 ---Escape sequences:
@@ -60,10 +65,6 @@ function swi.exit(code) end
 ---@return { x :integer, y: integer } # Coordinates of the mouse pointer
 function swi.get_mouse_pos() end
 
----Toggle full screen mode.
----@return boolean # True if full screen is enabled
-function swi.toggle_fullscreen() end
-
 ---Get application window size.
 ---@return { width: integer, height: integer } # Window size in pixels
 function swi.get_window_size() end
@@ -79,8 +80,8 @@ function swi.set_window_size(width, height) end
 ---| "ImgChange" # after selected image has changed, data: new image
 ---| "ImgChangePre" # just before selecting a different image, data: old image
 ---| "OptionSet" # after setting any option in the api, match: opt object path, data: opt value
----| "ShellCmdPost" # after swi.exec, data: {[cmd],[out]}
----| "ModeChanged" # match: new mode, mode: old mode
+---| "ShellCmdPost" # after swi.exec, match: cmd, data: output
+---| "ModeChanged" # match: 'o:n' as in old:new, mode: new mode, data: old mode
 ---| "WinResized" # when a window is resized, data: new size
 ---| "SwiEnter" # just after loading config and initializing imagelist
 ---| "SwiLeavePre" # before exiting swayimg - hooks for given statuscode must deregister to exit
@@ -255,6 +256,7 @@ function swi.text.set_status(status) end
 ---@class mode_base: proxy
 ---@field text mode_base.text access to setting the overlay fields/indexes
 ---@field mark_color integer Mark icon color in ARGB format
+---@field pinch_factor number how aggressive should the effect be
 local mode_base = {}
 
 ---Map a keyboard or mouse event to an action.
@@ -266,12 +268,14 @@ function mode_base.map(bind, action, desc) end
 ---@param bind string keybind to disable
 function mode_base.unmap(bind) end
 
----@class mapping_cfg
----@field cb function the action that runs on the binding activation
+---@class mapping
+---@field cb function|string the action that runs on the binding activation (or the shell command)
 ---@field trace string where was the binding defined
 ---@field desc? string optional description of the action
 
----@return table<string,mapping_cfg> map of the user bindings
+---@alias mode_mappings table<string,mapping>
+
+---@return mode_mappings map of the user bindings
 function mode_base.get_mappings() end
 
 --------------------------------------------------------------------------------
@@ -321,6 +325,7 @@ function mode_base.get_mappings() end
 ---This is the viewport approach!
 ---Example: ←↑ corner of the image is outside the window -> `x,y<0`
 ---@field position fixed_position_t|{x:integer,y:integer}
+---@field centering boolean should image be automatically centered when smaller than window size
 ---@field animation boolean State of the image (GIF) animation
 ---@field window_background integer|bkgmode_t Window background: solid ARGB color or fill mode
 ---Background color or pattern for transparent images (ARGB)
@@ -331,6 +336,13 @@ function mode_base.get_mappings() end
 swi.viewer = {}
 
 do
+	---Open the file at the specified path.
+	---Since 5.2.
+	---
+	---This function adds a file to the image list and then opens it in the viewer.
+	---@param path string Path to the file
+	function swi.viewer.open(path) end
+
 	---Open the next file in the specified direction.
 	---@see swi.viewer.go equivalent using named methods for easier mapping
 	---@param dir vdir_t Next file direction
@@ -425,8 +437,8 @@ function swi.gallery.switch_image(dir) end
 ---@return swayimg.entry # Currently selected image entry
 function swi.gallery.get_image() end
 
---- TODO: help mode
-
----@class swi.help
+---@class swi.help: proxy
 ---@field enabled boolean
+---@field pager swi.api.pager holds the scrolling position of the tab - .line, .page
+---@field tab integer which help tab are we on
 swi.help = {}

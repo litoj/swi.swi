@@ -1,6 +1,8 @@
+---@module 'swi.api.proxy'
+
 local e = require 'swi.api.eventloop'
 
----@class swi.api.proxy: proxy,metatable
+---@class swi.api.proxy: proxy
 local M = {}
 
 function M.__index(self, idx)
@@ -24,17 +26,27 @@ end
 
 function M.__newindex(self, idx, val)
 	local fn = self._overrides[idx] or self._overrides['*']
+	local old = rawget(self, '_' .. idx)
 	if type(fn) == 'table' and fn.set then
-		fn.set(self, val, idx)
+		-- set the field only if the setter allows it
+		---@diagnostic disable-next-line: cast-local-type
+		fn = fn.set(self, val, idx)
+		if fn == nil then
+			rawset(self, '_' .. idx, val)
+			---@diagnostic disable-next-line: cast-local-type
+			fn = true
+		end
 	else
-		fn = self._api[(type(val) == 'boolean' and 'enable_' or 'set_') .. idx]
+		fn = type(val) == 'boolean' and self._api['enable_' .. idx] or self._api['set_' .. idx]
 		if not fn then error('tried to assign: ' .. self._path .. '.' .. idx) end
 
 		fn(val)
+		rawset(self, '_' .. idx, val) -- set in case a getter isn't available
 	end
 
-	rawset(self, '_' .. idx, val) -- set in case a getter isn't available
-	e.trigger { event = 'OptionSet', match = ('%s.%s'):format(self._path, idx), data = val }
+	if fn and self._trigger then
+		e.trigger { event = 'OptionSet', match = ('%s.%s'):format(self._path, idx), data = val, old_data = old }
+	end
 end
 
 ---Create a dynamic table where variable I/O can be custom-defined
@@ -42,6 +54,11 @@ end
 ---@generic O: proxy
 ---@param base `O`
 ---@return O
-function M.new(base) return setmetatable(base, M) end
+function M.new(base)
+	---@diagnostic disable-next-line: inject-field
+	if not base._api then base._api = {} end
+	if base._trigger == nil then base._trigger = true end
+	return setmetatable(base, M)
+end
 
 return M

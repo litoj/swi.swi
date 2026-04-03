@@ -26,9 +26,9 @@ What's up with the name? You tell me:
 </summary>
 
 - options now accessible as variables: `swi.text.size = swi.text.size*1.1`
-- forward compatible: original api is still forwarded through `swi` so all additions are still
+- forward compatible: original api is still directly forwarded through `swi` so all additions are
   available and any setter/enabler and getter methods will automatically be accessible as variables,
-  even if not documented
+  even if not documented yet.
 - common actions as directly mappable functions:
   ```lua
   v.map('Right', v.go.next)
@@ -72,6 +72,7 @@ What's up with the name? You tell me:
     - `%s`: falls back to current file
     - `%m`: doesn't execute the command if no files were marked
   - `%`: unquoted current (like in 4.x): `v.map('', [[bash -c '$(which trash || echo rm) "%"']])`
+- custom **help mode** that lets you see all available keybindings or settings
 
 ### New scaling modes
 
@@ -84,7 +85,6 @@ What's up with the name? You tell me:
 ### TODOs
 
 - temporary keybind mode - for multi-key bindings (`gm` etc.)
-- help mode
 
 ### [Snippets](./snippets.lua)
 

@@ -1,4 +1,4 @@
----@module 'swi.api.utils'
+---@module 'swi.utils'
 local M = {}
 
 ---@generic O
@@ -22,6 +22,17 @@ function M.rev_idx(t)
 		r[v] = k
 	end
 	return r
+end
+
+---@generic O: table
+---@param t `O`
+---@return O t copy
+function M.soft_copy(t)
+	local ret = {}
+	for k, v in pairs(t) do
+		ret[k] = v
+	end
+	return ret
 end
 
 ---Nicely format the requested value to human readable rational numbers.
@@ -60,10 +71,15 @@ M.key_map = {
 	BS = 'BackSpace',
 	Del = 'Delete',
 	Esc = 'Escape',
-	CR = 'Enter',
+	CR = 'Return',
+	Enter = 'Return',
+	PgUp = 'Prior',
+	PgDown = 'Next',
+	PageUp = 'Prior',
+	PageDown = 'Next',
 	['`'] = 'grave',
 	['~'] = 'asciitilde',
-	[' '] = 'space',
+	[' '] = 'Space',
 	['-'] = 'minus',
 	['_'] = 'underscore',
 	['='] = 'equal',
@@ -77,9 +93,12 @@ for _, v in ipairs { 'Middle', 'Left', 'Right' } do
 end
 for _, v in ipairs { 'Left', 'Right', 'Up', 'Down' } do
 	M.key_map['SM' .. v:sub(1, 1)] = 'Scroll' .. v
+	M.key_map[v:sub(1, 1) .. 'MS'] = 'Scroll' .. v
 end
 
 ---Parse vim-like shortcuts into classic gui-style.
+---@param bind string
+---@return string
 function M.transform_key(bind)
 	if bind:match '^<.+>$' then bind = bind:sub(2, -2) end
 	bind = bind:gsub('[AM][+-]', 'Alt+', 1):gsub('S[+-]', 'Shift+', 1):gsub('C[+-]', 'Ctrl+', 1)
@@ -90,6 +109,22 @@ function M.transform_key(bind)
 		local key = bind:match '[^+-]*.$'
 		bind = bind:sub(1, -#key - 1) .. (M.key_map[key] or key)
 	end
+	return bind
+end
+
+M.rev_key_map = M.rev_idx(M.key_map)
+
+function M.short_key_name(bind)
+	bind = bind:gsub('Alt[+-]', 'A-'):gsub('Shift[+-]', 'S-'):gsub('Ctrl[+-]', 'C-')
+	if bind:match 'ISO_Left_Tab$' then
+		bind = bind:gsub('S-(.*)ISO_Left_Tab', '%1')
+	else
+		local key = bind:match '[^+-]*.$'
+		local found = M.rev_key_map[key]
+		bind = bind:sub(1, -#key - 1) .. (found or key)
+		if found then return ('<%s>'):format(bind) end
+	end
+	if bind:match '-.' then bind = ('<%s>'):format(bind) end
 	return bind
 end
 
@@ -138,8 +173,37 @@ function M.pretty_trace(action_match, stacktrace)
 		:gsub('^.-' .. action_match .. "'\n", '') -- trim interals up to traced fn
 		:gsub('[^\n]+proxy[^\n]+\n', '') -- trim all proxy calls
 		:gsub('[^\n<"]+/swayimg/', '') -- trim path to config dir
+		:gsub('[ \t]*%./', '') -- trim path to config dir
 		:gsub("in function '*([^%s']+)'?", '%1()') -- format as a fn call
-		:gsub('\n%s+%[C%][^\n]+', '') -- trim [C] calls
+		-- :gsub('\n%s+%[C%][^\n]+', '') -- trim [C] calls
+		:gsub('\n(%S)', '\n\t%1') -- indent continuing lines
+end
+
+---@param path string
+---@return false? false if operation failed due to incomplete path
+function M.set_var_by_path(path, new)
+	local val = _G
+	for key in path:gmatch '([^.]+)%.' do
+		if val == nil then return false end
+		val = val[key]
+	end
+	val[path:match '[^.]+$'] = new
+end
+
+---@param ptn string|string[]? event pattern to specify which exact options to watch for
+---@return fun():table<string,any> reclaimer call it to finish collection of option changes
+function M.capture_opt_changes(ptn)
+	local t = {}
+	local hook_id = e.subscribe {
+		event = 'OptionSet',
+		pattern = ptn,
+		---@diagnostic disable-next-line: undefined-field
+		callback = function(ev) t[ev.match] = { old = ev.old_data, new = ev.data } end,
+	}
+	return function()
+		e.unsubscribe(hook_id)
+		return t
+	end
 end
 
 return M

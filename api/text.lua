@@ -1,6 +1,21 @@
 ---@diagnostic disable: invisible
+---@module 'swi.api.text'
 ---@class swi.api.text: swi.text
-local M = { _api = swayimg.text, _path = 'swi.text', _line_spacing = 1, _size = 15 }
+local M = {
+	_api = swayimg.text,
+	_path = 'swi.text',
+
+	_font = 'monospace',
+	_size = 24,
+
+	_enabled = true,
+	_status_timeout = 3,
+	_line_spacing = 1,
+	_padding = 10,
+	_foreground = 0xffcccccc,
+	_background = 0x00000000,
+	_shadow = 0xd0000000,
+}
 
 M.is_visible = swayimg.text.visible
 
@@ -24,6 +39,7 @@ local function set_size(self, val)
 	-- update line spacing
 	self._size = val
 	set_spacing(self, self._line_spacing)
+	return true
 end
 
 M._overrides = {

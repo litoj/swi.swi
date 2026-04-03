@@ -1,48 +1,22 @@
 ---@diagnostic disable: invisible
+---@module 'swi.api'
+
 local proxy = require 'swi.api.proxy'
 local e = require 'swi.api.eventloop'
 
 ---@type swi
 ---@diagnostic disable-next-line: missing-fields
-local M = { _api = swayimg, _path = 'swi', initialized = false }
+local M = { _api = swayimg, _path = 'swi', _overrides = {}, initialized = false }
 
 M.eventloop = e
 M.imagelist = require 'swi.api.imagelist'
 M.text = require 'swi.api.text'
-
 do
 	local viewer_proxy = require('swi.api.viewer').new
 	M.viewer = viewer_proxy 'viewer'
 	M.slideshow = viewer_proxy 'slideshow'
 end
-
-do
-	local api = swayimg.gallery
-	local g = { _api = api }
-
-	g.go = setmetatable({}, {
-		__index = function(tbl, idx)
-			tbl[idx] = function() api.switch_image(idx) end
-			return tbl[idx]
-		end,
-	})
-
-	g._overrides = { cache_limit = { set = function(self, x) self._api.limit_cache(x) end } }
-
-	e.subscribe { -- ad-hoc registering for when user wants to subscribe
-		event = 'Subscribed',
-		mode = 'gallery',
-		pattern = 'ImgChange',
-		callback = function()
-			api.on_image_change(
-				function() e.trigger { event = 'ImgChange', mode = 'gallery', data = api.get_image() } end
-			)
-			return true
-		end,
-	}
-
-	M.gallery = require('swi.api.mode_base').new(g, 'gallery')
-end
+M.gallery = require 'swi.api.gallery'
 
 function M.exit(code)
 	local ev = { event = 'SwiLeavePre', match = tostring(code), data = code }
@@ -82,28 +56,30 @@ function M.exec(cmd)
 	if not p then error('invalid command: ' .. cmd) end
 	local out = p:read '*a'
 	p:close()
-	e.trigger { event = 'ShellCmdPost', data = { cmd = cmd, out = out } }
+	e.trigger { event = 'ShellCmdPost', match = cmd, data = out }
 end
 
-M._overrides = {
-	mode = {
-		set = function(self, v)
-			local m = self._api.get_mode()
-			self._api.set_mode(v)
-			e.trigger { event = 'ModeChanged', mode = m, match = v }
-		end,
-	},
+M._overrides.mode = {
+	set = function(self, v)
+		local m = self._api.get_mode()
+		self._api.set_mode(v)
+		e.trigger { event = 'ModeChanged', mode = v, match = ('%s:%s'):format(m:sub(1, 1), v:sub(1, 1)), data = m }
+		return false
+	end,
 }
+
+-- ensure even the default keymappings trigger our events by redefining the defaults
+_G.swi = proxy.new(M)
+require('swi.api.keymappings').default()
 
 swayimg.on_window_resize(function()
 	local ws = swayimg.get_window_size()
-	local ows = rawget(M, '_window_size')
+	local ows = rawget(M, '_old_winsize')
 	if not ows or ows.width ~= ws.width or ows.height ~= ws.height then
 		-- TODO: find a way to distinguish focus events from resizing (both can happen at once)
 		e.trigger { event = 'WinResized', data = ws }
-		rawset(M, '_window_size', ws)
+		rawset(M, '_old_winsize', ws)
 	end
 end)
 
-_G.swi = M
-return proxy.new(M)
+return M

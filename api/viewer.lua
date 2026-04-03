@@ -1,4 +1,6 @@
 ---@diagnostic disable: invisible
+---@module 'swi.api.viewer'
+
 local e = require 'swi.api.eventloop'
 local U = require 'swi.utils'
 local mode_base = require 'swi.api.mode_base'
@@ -41,7 +43,7 @@ function M.set_default_scale(self, x)
 	if x:sub(1, 8) == 'keep_by_' then
 		if not ({ width = 1, height = 1, size = 1 })[x:sub(9)] then error('Invalid default scale: ' .. x) end
 		x = 'keep'
-		self._last = { s = 0, x = 0, y = 0 }
+		self._last = { w = 0, h = 0, x = 0, y = 0 }
 		e.subscribe {
 			event = 'ImgChangePre',
 			group = '_cust_default_scale',
@@ -92,8 +94,21 @@ end
 ---@param api_name 'viewer'|'slideshow'
 function M.new(api_name)
 	local api = swayimg[api_name] ---@type swayimg.viewer
+	---@type swi.api.viewer
 	---@diagnostic disable-next-line: missing-fields
-	local self = { _api = api, _default_scale = 'optimal', _last = false } ---@type swi.api.viewer
+	local self = {
+		_api = api,
+		_last = false,
+
+		_centering = true,
+		_loop = true,
+		_default_position = 'center',
+		_image_background = { 0xff333333, 0xff4c4c4c, size = 20 }, -- chessboard
+
+		_default_scale = api_name == 'viewer' and 'optimal' or 'fit',
+		_window_background = api_name == 'viewer' and 0xff000000 or 'auto',
+		_history_limit = api_name == 'viewer' and 1 or 0,
+	}
 
 	self.get_abs_scale = api.get_scale
 	self.go = M.new_go(api)
@@ -102,14 +117,33 @@ function M.new(api_name)
 		api.set_abs_scale(s, x, y)
 		rawset(self, '_scale', s)
 	end
+	self.open = function(path)
+		e.trigger { event = 'ImgChangePre', data = U.lazy(api.get_image) }
+		api.open(path)
+		e.trigger { event = 'OptionSet', match = 'swi.imagelist.size', data = swi.imagelist.size() }
+	end
 
 	self._overrides = {
 		default_scale = { set = M.set_default_scale },
 		scale = { set = M.set_scale, get = M.get_scale },
 		position = { set = M.set_position },
 		image_background = { set = M.set_img_bg },
-		preload_limit = { set = function(self, x) self._api.limit_preload(x) end },
-		history_limit = { set = function(self, x) self._api.limit_history(x) end },
+		preload_limit = {
+			set = function(self, x)
+				x = math.floor(x)
+				self._api.limit_preload(x)
+				rawset(self, '_preload_limit', x)
+				return true
+			end,
+		},
+		history_limit = {
+			set = function(self, x)
+				x = math.floor(x)
+				self._api.limit_history(x)
+				rawset(self, '_history_limit', x)
+				return true
+			end,
+		},
 	}
 
 	api.on_image_change(function()
@@ -135,7 +169,32 @@ function M.new(api_name)
 		api.set_abs_position(last.x, last.y)
 	end)
 
-	return mode_base.new(self, api_name)
+	self = mode_base.new(self, api_name)
+
+	if api_name == 'viewer' then
+		rawset(self.text, '_topleft', {
+			'File:\t{name}',
+			'Format:\t{format}',
+			'File size:\t{sizehr}',
+			'File time:\t{time}',
+			'EXIF date:\t{meta.Exif.Photo.DateTimeOriginal}',
+			'EXIF camera:\t{meta.Exif.Image.Model}',
+		})
+		rawset(self.text, '_topright', {
+			'Image:\t{list.index} of {list.total}',
+			'Frame:\t{frame.index} of {frame.total}',
+			'Size:\t{frame.width}x{frame.height}',
+		})
+		rawset(self.text, '_bottomleft', { 'Scale: {scale}' })
+		rawset(self.text, '_bottomright', {})
+	else
+		rawset(self.text, '_topleft', {})
+		rawset(self.text, '_topright', { '{name}' })
+		rawset(self.text, '_bottomleft', {})
+		rawset(self.text, '_bottomright', {})
+	end
+
+	return self
 end
 
 return M

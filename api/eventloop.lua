@@ -1,3 +1,5 @@
+---@module 'swi.api.eventloop'
+
 local U = require 'swi.utils'
 local tabled = U.tabled
 
@@ -23,21 +25,27 @@ end
 ---@param cfg swi.eventloop.subscribe.opts
 ---@return swi.eventloop.hook
 local function mk_hook(cfg)
-	local t = {}
-	for _, p in ipairs(tabled(cfg.pattern or '')) do
-		if p:match '[*+?%%^$%[%]()]' then
-			t[#t + 1] = p
-		elseif p:sub(1, 1) == '!' then
-			t[p:sub(2)] = false
-		else
-			t[p] = true
+	local t = tabled(cfg.pattern or {})
+	local i = #t
+	while i > 0 do
+		local p = t[i]
+		if p and not p:match '[*+?%%^$%[%]()]' then
+			--- make direct matches into indexes
+			if p:sub(1, 1) == '!' then
+				t[p:sub(2)] = false
+			else
+				t[p] = true
+			end
+			table.remove(t, i)
 		end
+		i = i - 1
 	end
 	cfg.pattern = t ---@cast cfg swi.eventloop.hook
 	return cfg
 end
 
 local function has_match(match, ptnlist)
+	if not match or not next(ptnlist) then return true end
 	local direct = ptnlist[match]
 	if direct ~= nil then return direct end
 	for _, p in ipairs(ptnlist) do
@@ -57,7 +65,7 @@ local function apply_filtered(f, on_match)
 				local m_hooks = ev_hooks[m]
 				if m_hooks then
 					for i, hook in pairs(m_hooks) do
-						local ok = not f.match or has_match(f.match, hook.pattern)
+						local ok = has_match(f.match, hook.pattern)
 						if f.id and ok then ok = f.id == i end
 						if f.group and ok then ok = f.group == hook.group end
 						if ok then on_match(hook, i, m, ev) end
@@ -102,8 +110,7 @@ function M.trigger(state)
 		if not ok then
 			---@diagnostic disable-next-line: param-type-mismatch
 			swayimg.text.set_status(string.gsub(ret, '\t', '  '))
-			---@diagnostic disable-next-line: param-type-mismatch
-			io.stderr:write(ret)
+			print(ret)
 		elseif ret then
 			M.unsubscribe { id = hook }
 		end
@@ -130,8 +137,8 @@ function M.subscribe(hook) -- TODO: generalize ptn matching to matching and regi
 			end
 
 			m_hooks[hook] = hook
-			M.trigger { event = 'Subscribed', mode = m, match = e, data = hook }
 		end
+		M.trigger { event = 'Subscribed', mode = hook.mode, match = e, data = hook }
 	end
 
 	return hook
@@ -155,7 +162,7 @@ swayimg.on_initialized(function()
 
 	M.subscribe {
 		event = 'Subscribed',
-		match = 'SwiEnter',
+		pattern = 'SwiEnter',
 		-- ensure all hooks expecting initialization get loaded
 		-- (especially the lazy ones not checking swi.initialized)
 		callback = function(h)

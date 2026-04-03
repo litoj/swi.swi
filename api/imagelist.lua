@@ -1,3 +1,5 @@
+---@module 'swi.api.imagelist'
+
 local e = require 'swi.api.eventloop'
 
 local api = swayimg.imagelist

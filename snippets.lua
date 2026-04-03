@@ -1,3 +1,4 @@
+---@module 'swi.snippets'
 local M = {}
 
 function M.load_dir_if_single()
@@ -27,15 +28,15 @@ function M.print_option_changes(enable)
 			event = 'OptionSet',
 			pattern = { '!swi.imagelist.size', '^swi%.?[^.]*%.[^.]*$' }, -- all main opts - not the subsubtables (text etc.)
 			group = 'print_var_change',
-			callback = function(state)
-				local v = state.data
+			callback = function(ev)
+				local v = ev.data
 				if type(v) == 'number' then
 					v = string.format('%.2f', v)
 				elseif type(v) == 'table' then -- ignore window size and position changes
 					return
 				end
 
-				local name = state.match:match '([^.]+%.[^.]+)$'
+				local name = ev.match:match '([^.]+%.[^.]+)$'
 				swi.text.set_status(
 					('%s%s: %s'):format(
 						name:sub(1, 1):upper(),
@@ -112,7 +113,7 @@ end
 function M.print_shell_output()
 	swi.eventloop.subscribe {
 		event = 'ShellCmdPost',
-		callback = function(state) swi.text.set_status(state.data.out) end,
+		callback = function(ev) swi.text.set_status(ev.data) end,
 	}
 end
 
