@@ -19,7 +19,7 @@ local M = {
 
 M.is_visible = swayimg.text.visible
 
----@param self swi.text
+---@param self swi.api.text
 local function set_enabled(self, val)
 	if val == true then
 		self._api.show()
@@ -32,7 +32,9 @@ local function set_enabled(self, val)
 end
 
 -- transform scale factor into a pixel value
+---@param self swi.api.text
 local function set_spacing(self, val) self._api.set_spacing(math.floor((val - 1) * self._size)) end
+---@param self swi.api.text
 local function set_size(self, val)
 	self._api.set_size(val)
 

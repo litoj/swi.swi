@@ -128,9 +128,6 @@ function M.short_key_name(bind)
 	return bind
 end
 
----Original tostring method
-M.ts = tostring
-
 M.max_tbl_len = 100
 
 ---@param t table
@@ -150,7 +147,7 @@ function M.tbl_to_str(t, indent)
 
 		if type(k) == 'table' then k = '[]' end
 
-		s[#s + 1] = type(k) == 'string' and ('%s=%s'):format(k, M.ts(v)) or M.ts(v)
+		s[#s + 1] = type(k) == 'string' and ('%s=%s'):format(k, tostring(v)) or tostring(v)
 		space = space - #s[#s]
 	end
 	if space <= 0 then
@@ -160,10 +157,16 @@ function M.tbl_to_str(t, indent)
 	end
 end
 
+---Original tostring method
+M.ts = tostring
+
 function M.to_pretty_str(x)
 	if type(x) == 'table' then return M.tbl_to_str(x, '') end
+	if type(x) == 'number' and x > 0x00ffffff then return ('0x%x'):format(x) end
 	return M.ts(x)
 end
+
+_G.tostring = M.to_pretty_str
 
 ---@param action_match string luapat to match the last internal trace to trim
 ---@param stacktrace string use debug.traceback() to get the trace

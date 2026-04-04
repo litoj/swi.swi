@@ -117,13 +117,4 @@ function M.print_shell_output()
 	}
 end
 
----@param enable boolean? true by default
-function M.pretty_print_tables(enable)
-	if enable == false then
-		_G.tostring = require('swi.utils').ts
-	else
-		_G.tostring = require('swi.utils').to_pretty_str
-	end
-end
-
 return M

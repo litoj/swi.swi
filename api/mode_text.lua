@@ -23,6 +23,37 @@ local function replace_exif_vars(line, img)
 	return line
 end
 
+local function replace_swi_vars(line, vars, ev)
+	if ev then
+		line = line:gsub(('{%s}'):format(ev.match), U.to_pretty_str(ev.data))
+		if not line or #vars == 1 then return line end
+	end
+
+	-- process all other variables
+	for var, path in line:gmatch '({swi%.([a-z0-9._]+)})' do
+		local val = swi
+		for key in path:gmatch '[^.]+' do
+			val = val[key]
+			if type(val) == 'function' then val = val() end
+			if val == nil then return end
+		end
+		line = line:gsub(var, U.to_pretty_str(val))
+	end
+	return line
+end
+
+local function generate_exif_updater(line)
+	return function(img) return replace_exif_vars(line, img) or '' end
+end
+
+local function generate_var_updater(line, varpaths)
+	return { -- TODO: possible optimization by rendering only when mode and text are active + on modechange
+		event = 'OptionSet',
+		pattern = varpaths,
+		callback = function(ev) return replace_swi_vars(line, varpaths, ev) or '' end,
+	}
+end
+
 local function render_hook(processed, i, hook, ...)
 	local out = hook(...)
 	if type(out) == 'table' then
@@ -40,13 +71,7 @@ end
 local function render_on_img(tracker, api, placement, img)
 	local p = tracker.processed
 	for i, line in pairs(tracker) do
-		if type(i) == 'number' then
-			if type(line) == 'function' then
-				render_hook(p, i, line, img)
-			else
-				p[i] = replace_exif_vars(line, img)
-			end
-		end
+		if i ~= 'processed' then render_hook(p, i, line, img) end
 	end
 	api.set_text(placement, p)
 end
@@ -84,32 +109,6 @@ local function initialize(self)
 	return tracked
 end
 
-local function generate_var_updater(line, varpaths)
-	return { -- TODO: possible optimization by rendering only when mode and text are active + on modechange
-		event = 'OptionSet',
-		pattern = varpaths,
-		callback = function(ev)
-			local line = line
-			if ev then
-				line = line:gsub(('{%s}'):format(ev.match), U.to_pretty_str(ev.data))
-				if not line or #varpaths == 1 then return line end
-			end
-
-			-- process all other variables
-			for var, path in line:gmatch '({swi%.([a-z0-9._]+)})' do
-				local val = swi
-				for key in path:gmatch '[^.]+' do
-					val = val[key]
-					if type(val) == 'function' then val = val() end
-					if val == nil then return end
-				end
-				line = line:gsub(var, U.to_pretty_str(val))
-			end
-			return line
-		end,
-	}
-end
-
 ---@param self swi.api.mode_text
 ---@param placement block_position_t
 local function set_text(self, x, placement)
@@ -122,14 +121,21 @@ local function set_text(self, x, placement)
 	local processed = {}
 	local has_hooks = false
 	for i, v in pairs(x) do -- find all custom templates
+		-- check for a custom template implementation and replace it with the correct generator
 		if type(v) == 'string' then
 			local varpaths = {}
 			for path in v:gmatch '{(swi%.[a-z0-9._]+)}' do
 				varpaths[#varpaths + 1] = path
 			end
-			if #varpaths > 0 then v = generate_var_updater(v, varpaths) end
+
+			if #varpaths > 0 then
+				v = generate_var_updater(v, varpaths)
+			elseif v:find '[^{]{[A-Z]' or v:find '^{[A-Z]' then
+				v = generate_exif_updater(v)
+			end
 		end
 
+		-- register the generators and normal lines to be ready to render and update
 		if type(v) == 'table' then ---@cast v mode_base.text.dyntext
 			has_hooks = true
 
@@ -143,7 +149,7 @@ local function set_text(self, x, placement)
 
 			-- load the default value
 			render_hook(processed, i, v.callback, nil)
-		elseif type(v) == 'function' or v:find '{[A-Z]' then
+		elseif type(v) == 'function' then
 			new_tr[i] = v
 		else
 			processed[i] = v

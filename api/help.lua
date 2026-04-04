@@ -8,7 +8,15 @@ local U = require 'swi.utils'
 ---@class swi.api.help: swi.help
 ---@field pager swi.api.pager
 ---@field help_pager swi.api.pager
-local M = { _api = {}, _path = 'swi.help', _overrides = {}, _cache = {}, _tab = 1, _enabled = false }
+local M = {
+	_api = {},
+	_path = 'swi.help',
+	_overrides = {},
+	_cache = {},
+	_tab = 1,
+	_enabled = false,
+	key_alignment = 15,
+}
 
 local modes = { 'gallery', 'viewer', 'slideshow' }
 
@@ -64,7 +72,7 @@ local function gather_keymaps(mode_names)
 end
 
 ---Gather all settings/configuration variables
----@return table<string,table<string,string>>[] sections List of all setting sections with their variables
+---@return {name:string,list:{name:string,value:string}} sections List of all setting sections with their variables
 local function gather_settings()
 	-- Dynamically find settings based on setter methods and overrides
 	local targets = {
@@ -82,7 +90,7 @@ local function gather_settings()
 		local settable_fields = discover_settable_fields(swiapi)
 
 		for _, field in ipairs(settable_fields) do
-			list[#list + 1] = { name = field.name, value = U.to_pretty_str(field.value) }
+			list[#list + 1] = { name = field.name, value = U.to_pretty_str(field.value):gsub('{', '{{') }
 		end
 
 		if #list > 0 then result[#result + 1] = { name = swiapi._path, list = list } end
@@ -95,6 +103,7 @@ local function mode_bindlist(mode)
 	mode = mode or swi.mode
 	local function get_desc(item) return item.desc or (type(item.cb) == 'string' and item.cb) or item.trace end
 
+	local fmt = ('  %%%ds: %%s'):format(M.key_alignment)
 	local out = {}
 	local binds = gather_keymaps(mode)[mode]
 	if #binds > 0 then
@@ -105,10 +114,7 @@ local function mode_bindlist(mode)
 			i = i + 1
 			item = binds[i]
 			if last[1] ~= item.trace then
-				out[#out + 1] = ('  %20s: %s'):format(
-					table.concat(last[2], ', '),
-					last[3]:gsub('\t', ''):gsub('\n', ' ')
-				)
+				out[#out + 1] = (fmt):format(table.concat(last[2], ', '), last[3]:gsub('\t', ''):gsub('\n', ' '))
 
 				last = { item.trace, {}, get_desc(item) }
 			end
