@@ -6,7 +6,17 @@ local e = require 'swi.api.eventloop'
 
 ---@type swi
 ---@diagnostic disable-next-line: missing-fields
-local M = { _api = swayimg, _path = 'swi', _overrides = {}, initialized = false }
+local M = {
+	_api = swayimg,
+	_path = 'swi',
+	_overrides = {},
+	initialized = false,
+
+	_exif_orientation = true, -- automatically applied only to raw files
+	_antialiasing = false,
+	_decoration = true,
+	_dnd_button = 'MouseRight',
+}
 
 M.eventloop = e
 M.imagelist = require 'swi.api.imagelist'
