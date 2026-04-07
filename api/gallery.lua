@@ -28,7 +28,10 @@ local M = {
 
 M.go = setmetatable({}, {
 	__index = function(tbl, idx)
-		tbl[idx] = function() api.switch_image(idx) end
+		tbl[idx] = function()
+			e.trigger { event = 'ImgChangePre', mode = 'gallery', match = 'gallery', data = api.get_image() }
+			api.switch_image(idx)
+		end
 		return tbl[idx]
 	end,
 })
@@ -55,7 +58,9 @@ e.subscribe { -- ad-hoc registering for when user wants to subscribe
 	mode = 'gallery',
 	pattern = 'ImgChange',
 	callback = function()
-		api.on_image_change(function() e.trigger { event = 'ImgChange', mode = 'gallery', data = api.get_image() } end)
+		api.on_image_change(
+			function() e.trigger { event = 'ImgChange', mode = 'gallery', match = 'gallery', data = api.get_image() } end
+		)
 		return true
 	end,
 }

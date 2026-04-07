@@ -31,7 +31,11 @@ function M.print_option_changes(enable)
 			callback = function(ev)
 				local v = ev.data
 				if type(v) == 'number' then
-					v = string.format('%.2f', v)
+					if math.floor(v * 100) == v * 100 then
+						v = '' .. v
+					else
+						v = ('%.2f'):format(v)
+					end
 				elseif type(v) == 'table' then -- ignore window size and position changes
 					return
 				end

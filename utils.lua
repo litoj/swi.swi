@@ -128,7 +128,7 @@ function M.short_key_name(bind)
 	return bind
 end
 
-M.max_tbl_len = 100
+M.max_tbl_len = 80
 
 ---@param t table
 ---@param indent string?
@@ -162,7 +162,11 @@ M.ts = tostring
 
 function M.to_pretty_str(x)
 	if type(x) == 'table' then return M.tbl_to_str(x, '') end
-	if type(x) == 'number' and x > 0x00ffffff then return ('0x%x'):format(x) end
+	if type(x) == 'number' then
+		if x > 0x00ffffff then return ('0x%x'):format(x) end
+		if math.floor(x * 100) == x * 100 then return '' .. x end
+		return ('%.5f'):format(x)
+	end
 	return M.ts(x)
 end
 
@@ -204,7 +208,7 @@ function M.capture_opt_changes(ptn)
 		callback = function(ev) t[ev.match] = { old = ev.old_data, new = ev.data } end,
 	}
 	return function()
-		e.unsubscribe(hook_id)
+		e.unsubscribe { event = 'OptionSet', id = hook_id }
 		return t
 	end
 end

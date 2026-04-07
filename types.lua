@@ -77,8 +77,8 @@ function swi.set_window_size(width, height) end
 --- Event loop processing
 
 ---@alias event_name_t
----| "ImgChange" # after selected image has changed, data: new image
----| "ImgChangePre" # just before selecting a different image, data: old image
+---| "ImgChange" # after selected image has changed, match: mode, data: new image
+---| "ImgChangePre" # just before selecting a different image, math: mode, data: old image
 ---| "OptionSet" # after setting any option in the api, match: opt object path, data: opt value
 ---| "ShellCmdPost" # after swi.exec, match: cmd, data: output
 ---| "ModeChanged" # match: 'o:n' as in old:new, mode: new mode, data: old mode

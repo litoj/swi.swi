@@ -115,7 +115,8 @@ function M:render(force)
 		out[i] = lines[i]
 	end
 
-	self._mode_text._api.set_text(self._position, out)
+	self._mode_text[self._position] = out
+	-- self._mode_text._api.set_text(self._position, out)
 end
 
 ---@private
@@ -131,7 +132,7 @@ function M:_on_dst_change()
 	if self._mode_text then
 		self._original_text = self._mode_text[self._position]
 		-- nullify the text to then set it directly without any possible side-updates from prev events
-		self._mode_text[self._position] = {}
+		-- self._mode_text[self._position] = {}
 		self:render(true)
 	end
 end
@@ -261,11 +262,16 @@ M._overrides.enabled = {
 			self:recalibrate(true, true)
 
 			-- Listen for WinResized and OptionSet updates to recalculate per_page and re-render pager
+			local function recal(e) self:recalibrate(true, false) end
 			rawset(self, '_hooks', {
 				e.subscribe {
-					event = { 'WinResized', 'OptionSet' },
+					event = 'WinResized',
+					callback = recal,
+				},
+				e.subscribe {
+					event = 'OptionSet',
 					pattern = { 'swi.text.size', 'swi.text.line_spacing' },
-					callback = function() self:recalibrate(true, false) end,
+					callback = recal,
 				},
 			})
 		else

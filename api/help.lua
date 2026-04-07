@@ -147,18 +147,11 @@ end
 
 local function settings_list()
 	local out = {}
-	local render_vars = {}
-	local linear_idx = 1
 	-- First pass: collect lines + track selected index mapping
 	for i, sec in ipairs(gather_settings()) do
 		out[#out + 1] = ('%s:'):format(sec.name:upper())
 		for j, v in ipairs(sec.list) do
-			local computed_idx = linear_idx
-			local line_str = ('  %s\t%s'):format(v.name, v.value)
-			line_str = '  ' .. line_str
-			out[#out + 1] = line_str
-			table.insert(render_vars, { i = i, j = j, idx = computed_idx, sec = sec, var = v })
-			linear_idx = linear_idx + 1
+			out[#out + 1] = ('  %s\t{%s.%s}'):format(v.name, sec.name, v.name)
 		end
 	end
 	return 'Settings', out
@@ -263,20 +256,18 @@ function M.activate(self)
 	}
 
 	local captured = U.capture_opt_changes()
-	do
-		swi.viewer.default_scale = 'keep_by_width'
-		if swi.mode == 'viewer' then
-			--- third of the screen
-			-- swi.viewer.scale = swi.window_size.width / swi.viewer.image.width / 3
-			--- 1px of the screen
-			local img = swi.viewer.get_image()
-			swi.viewer.scale = 200 / math.min(img.width, img.height)
-		end
-		local gspace = swi.gallery.thumb_size + swi.gallery.padding_size
-		swi.gallery.thumb_size = gspace / 3
-		swi.gallery.padding_size = gspace / 3
-		swi.text.enabled = true
+
+	swi.viewer.default_scale = 'keep_by_width'
+	if swi.mode == 'viewer' then
+		--- 100px
+		local img = swi.viewer.get_image()
+		swi.viewer.scale = 100 / math.min(img.width, img.height)
 	end
+	local gspace = swi.gallery.thumb_size + swi.gallery.padding_size
+	swi.gallery.thumb_size = gspace / 3
+	swi.gallery.padding_size = gspace / 3
+	swi.text.enabled = true
+
 	self._cache.vars = captured()
 
 	M.help_pager.enabled = true

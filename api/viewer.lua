@@ -27,11 +27,11 @@ function M.new_step(self)
 	return step
 end
 
-function M.new_go(api)
+function M.new_go(api, api_name)
 	return setmetatable({}, {
 		__index = function(tbl, idx)
 			tbl[idx] = function()
-				e.trigger { event = 'ImgChangePre', data = U.lazy(api.get_image) }
+				e.trigger { event = 'ImgChangePre', mode = api_name, match = api_name, data = U.lazy(api.get_image) }
 				api.switch_image(idx)
 			end
 			return tbl[idx]
@@ -46,6 +46,7 @@ function M.set_default_scale(self, x)
 		self._last = { w = 0, h = 0, x = 0, y = 0 }
 		e.subscribe {
 			event = 'ImgChangePre',
+			pattern = self._path:sub(5),
 			group = '_cust_default_scale',
 			callback = function(state)
 				local i = state.data
@@ -56,7 +57,7 @@ function M.set_default_scale(self, x)
 			end,
 		}
 	else
-		e.unsubscribe { group = '_cust_default_scale' }
+		e.unsubscribe { group = '_cust_default_scale', match = self._path:sub(5) }
 		self._last = false
 	end
 	self._api.set_default_scale(x)
@@ -118,7 +119,7 @@ function M.new(api_name)
 		rawset(self, '_scale', s)
 	end
 	self.open = function(path)
-		e.trigger { event = 'ImgChangePre', data = U.lazy(api.get_image) }
+		e.trigger { event = 'ImgChangePre', match = api_name, data = U.lazy(api.get_image) }
 		api.open(path)
 		e.trigger { event = 'OptionSet', match = 'swi.imagelist.size', data = swi.imagelist.size() }
 	end
@@ -149,7 +150,7 @@ function M.new(api_name)
 	api.on_image_change(function()
 		local last = self._last
 		local img = last and api.get_image() or U.lazy(api.get_image)
-		e.trigger { event = 'ImgChange', mode = api_name, data = img }
+		e.trigger { event = 'ImgChange', mode = api_name, match = api_name, data = img }
 
 		rawset(self, '_scale', nil)
 		if not last then return end

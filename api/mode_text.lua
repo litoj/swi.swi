@@ -50,7 +50,7 @@ local function generate_var_updater(line, varpaths)
 	return { -- TODO: possible optimization by rendering only when mode and text are active + on modechange
 		event = 'OptionSet',
 		pattern = varpaths,
-		callback = function(ev) return replace_swi_vars(line, varpaths, ev) or '' end,
+		callback = function(ev) return replace_swi_vars(line, varpaths, ev):gsub('{', '{{') or '' end,
 	}
 end
 
@@ -145,6 +145,7 @@ local function set_text(self, x, placement)
 				self._api.set_text(placement, processed)
 			end
 			cfg.group = group
+			cfg.mode = self._api_name
 			e.subscribe(cfg)
 
 			-- load the default value
