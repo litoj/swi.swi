@@ -65,8 +65,9 @@ function M.resize_image_with_window()
 	swi.eventloop.subscribe {
 		event = 'WinResized',
 		mode = { 'viewer', 'slideshow' },
-		callback = function()
-			if type(v.scale) == 'string' then swayimg.viewer.set_fix_scale(v.scale) end
+		callback = function(ev)
+			local v = swi[ev.mode]
+			if type(v.scale) == 'string' then swayimg[ev.mode].set_fix_scale(v.scale) end
 		end,
 	}
 end

@@ -123,8 +123,8 @@ function M.apply_filtered(f, on_match)
 	local checks = {}
 	if f.id then checks[#checks + 1] = function(h) return f.id == h end end
 	if f.group then checks[#checks + 1] = function(h) return f.group == h.group end end
-	if f.mode then
-		f.mode = tabled(f.mode)
+	if f.mode and #f.mode ~= 3 then -- if there are only some modes
+		local modes = tabled(f.mode)
 		checks[#checks + 1] = function(h)
 			if not h.mode then return true end
 			for _, m in ipairs(modes) do
@@ -170,10 +170,10 @@ function M.get_subscribed(f)
 end
 
 function M.trigger(state)
-	if M.debug_trigger then print_debug('trigger', state) end
-
 	---@cast state swi.eventloop.filter.opts
 	state.mode = state.mode or swayimg.get_mode()
+	if M.debug_trigger then print_debug('trigger', state) end
+
 	M.apply_filtered(state, function(hook)
 		local ok, ret = xpcall(hook.callback, debug.traceback, state)
 		if not ok then
