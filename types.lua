@@ -426,6 +426,7 @@ swi.slideshow = {}
 ---@field preload boolean Preload invisible thumbnails
 ---@field pstore boolean Persistent storage for thumbnails
 ---@field pstore_path string Custom path to the directory for persistent thumbnail storage
+---@field embedded_thumb boolean Use embedded thumbnails. (5.3+)
 swi.gallery = {}
 
 ---Select the next thumbnail from the gallery.

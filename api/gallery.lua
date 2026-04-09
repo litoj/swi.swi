@@ -15,6 +15,7 @@ local M = {
 	_border_size = 5,
 	_padding_size = 5,
 	_selected_scale = 1.15,
+	_embedded_thumb = true,
 
 	_window_color = 0xff000000,
 	_background_color = 0xff202020,
