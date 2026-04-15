@@ -1,4 +1,7 @@
 ---@module 'swi.api.keymappings'
+
+local U = require 'swi.utils'
+
 local M = {}
 
 local g = swi.gallery
@@ -26,9 +29,16 @@ function M.map(mode, binds, cb, desc)
 	end
 end
 
-local map = M.map
-
 function M.default()
+	local function map(mode, binds, cb, desc)
+		for _, m in ipairs(modemap[mode]) do
+			for _, b in ipairs(U.tabled(binds)) do
+				---@diagnostic disable-next-line: missing-fields
+				m.remap(b, { cb = cb, desc = desc, default = true })
+			end
+		end
+	end
+
 	-- Custom keybind for our own help mode
 	map(
 		'a',

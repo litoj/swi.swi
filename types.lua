@@ -268,10 +268,16 @@ function mode_base.map(bind, action, desc) end
 ---@param bind string keybind to disable
 function mode_base.unmap(bind) end
 
+---@param bind string
+---@param mapping mapping config to set the bind to
+---@return mapping? old_bind previous config set for this binding
+function mode_base.remap(bind, mapping) end
+
 ---@class mapping
 ---@field cb function|string the action that runs on the binding activation (or the shell command)
 ---@field trace string where was the binding defined
 ---@field desc? string optional description of the action
+---@field default? boolean is it the default swayimg bind
 
 ---@alias mode_mappings table<string,mapping>
 
@@ -426,7 +432,7 @@ swi.slideshow = {}
 ---@field preload boolean Preload invisible thumbnails
 ---@field pstore boolean Persistent storage for thumbnails
 ---@field pstore_path string Custom path to the directory for persistent thumbnail storage
----@field embedded_thumb boolean Use embedded thumbnails. (5.3+)
+---@field embedded_thumb boolean Use embedded thumbnails.
 swi.gallery = {}
 
 ---Select the next thumbnail from the gallery.

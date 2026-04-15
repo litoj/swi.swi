@@ -12,7 +12,7 @@ local mode_text = require 'swi.api.mode_text'
 ---Function to set a mapping directly without updating the active mappings.
 ---Nil gets replaced with the default handler for unbound keys
 ---@field _set_raw_mapping fun(b:string,action:fun()?)
-local M = { warn_on_duplicates = false }
+local M = { warn_on_duplicates = true }
 
 ---@param self swi.api.mode_base
 ---@param api_name appmode_t
@@ -33,33 +33,40 @@ function M.new(self, api_name)
 	self._mappings = {}
 
 	self.text = mode_text.new(api, api_name)
-	self.map = function(b, action, desc)
-		local mapcfg = { ---@type mapping
+
+	local function pretty_trace(trace) return U.pretty_trace('mode_base.+map', trace) end
+
+	self.remap = function(b, bindcfg)
+		b = U.transform_key(b)
+		bindcfg.trace = bindcfg.trace or debug.traceback()
+
+		local old = self._mappings[b]
+		self._mappings[b] = bindcfg
+		self._set_raw_mapping(b, type(bindcfg.cb) == 'string' and function() swi.exec(bindcfg.cb) end or bindcfg.cb)
+		return old
+	end
+
+	self.map = function(bind, action, desc)
+		local bindcfg = { ---@type mapping
 			cb = action,
 			desc = desc,
 			trace = debug.traceback(),
 		}
 
-		if type(action) == 'string' then
-			local cmd = action
-			action = function() swi.exec(cmd) end
-		end
-
-		---@diagnostic disable-next-line: redefined-local
-		for _, b in ipairs(type(b) == 'table' and b or { b }) do
-			b = U.transform_key(b)
-
-			if M.warn_on_duplicates and self._mappings[b] then
-				print(('Duplicate mapping: %s.map("%s")'):format(api_name, b))
+		for _, b in ipairs(U.tabled(bind)) do
+			local old = self.remap(b, bindcfg)
+			if M.warn_on_duplicates and old and not old.default then
+				print(
+					('Duplicate mapping: %s.map("%s", %s)'):format(api_name, b, pretty_trace(old.trace):match '^[^\n]+')
+				)
 			end
-			self._mappings[b] = mapcfg
-			self._set_raw_mapping(b, action)
 		end
 	end
+
 	self.get_mappings = function()
 		for _, v in pairs(self._mappings) do
 			if not v._traced then
-				v.trace = U.pretty_trace('mode_base.+map', v.trace)
+				v.trace = pretty_trace(v.trace)
 				---@diagnostic disable-next-line: inject-field
 				v._traced = true
 			end
