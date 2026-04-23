@@ -198,7 +198,7 @@ function M.set_var_by_path(path, new)
 end
 
 ---@param ptn string|string[]? event pattern to specify which exact options to watch for
----@return fun():table<string,any> reclaimer call it to finish collection of option changes
+---@return fun():table<string,{old:any,new:any}> reclaimer call it to finish collection of option changes
 function M.capture_opt_changes(ptn)
 	local t = {}
 	local hook_id = e.subscribe {
@@ -210,6 +210,14 @@ function M.capture_opt_changes(ptn)
 	return function()
 		e.unsubscribe { event = 'OptionSet', id = hook_id }
 		return t
+	end
+end
+
+---Restore captured option changes back to their original values.
+---@param captured table<string,{old:any,new:any}> captured changes from capture_opt_changes()
+function M.restore_captured_changes(captured)
+	for path, state in pairs(captured) do
+		M.set_var_by_path(path, state.old)
 	end
 end
 

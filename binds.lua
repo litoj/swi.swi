@@ -1,4 +1,4 @@
----@module 'swi.api.keymappings'
+---@module 'swi.binds'
 
 local U = require 'swi.utils'
 
@@ -52,7 +52,7 @@ function M.default()
 	map('a', 'Escape', swi.exit, 'Exit application')
 	map('a', 's', function() swi.mode = swi.mode == 'slideshow' and 'viewer' or 'slideshow' end, 'Toggle slideshow')
 	map('a', 'Insert', function() l.marked.set_current 'toggle' end, 'Toggle mark on current entry')
-	map('a', 'f', function() swi.fullscreen = nil end, 'Toggle fullscreen')
+	map('a', 'f', function() swi.fullscreen = not swi.fullscreen end, 'Toggle fullscreen')
 	map('a', 'a', function() swi.antialiasing = not swi.antialiasing end, 'Toggle antialiasing')
 
 	-- Gallery

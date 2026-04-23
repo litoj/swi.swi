@@ -13,7 +13,7 @@ local M = {
 	initialized = false,
 
 	_exif_orientation = true, -- automatically applied only to raw files
-	_antialiasing = false,
+	_antialiasing = true,
 	_decoration = true,
 	_dnd_button = 'MouseRight',
 }
@@ -80,7 +80,7 @@ M._overrides.mode = {
 
 -- ensure even the default keymappings trigger our events by redefining the defaults
 _G.swi = proxy.new(M)
-require('swi.api.keymappings').default()
+require('swi.binds').default()
 
 swayimg.on_window_resize(function()
 	local ws = swayimg.get_window_size()

@@ -279,9 +279,7 @@ function M.deactivate(self)
 	M.help_pager.enabled = false
 
 	if swi.mode ~= 'viewer' then self._cache.vars['swi.viewer.scale'] = nil end
-	for path, state in pairs(self._cache.vars) do
-		if state.old ~= nil then U.set_var_by_path(path, state.old) end
-	end
+	U.restore_captured_changes(self._cache.vars)
 
 	e.unsubscribe { id = self._cache.mode_hook }
 
