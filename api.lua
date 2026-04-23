@@ -16,6 +16,7 @@ local M = {
 	_antialiasing = true,
 	_decoration = true,
 	_dnd_button = 'MouseRight',
+	_apply_raw_wb = true,
 }
 
 M.eventloop = e
@@ -76,6 +77,10 @@ M._overrides.mode = {
 		e.trigger { event = 'ModeChanged', mode = v, match = ('%s:%s'):format(m:sub(1, 1), v:sub(1, 1)), data = m }
 		return false
 	end,
+}
+
+M._overrides.apply_raw_wb = {
+	set = function(self, v) self._api.set_format_params('raw', { auto_wb = v }) end,
 }
 
 -- ensure even the default keymappings trigger our events by redefining the defaults

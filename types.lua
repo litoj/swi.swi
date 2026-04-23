@@ -27,6 +27,7 @@
 ---@field mode appmode_t Which mode is the application in
 ---@field antialiasing boolean Enable/disable antialiasing
 ---@field exif_orientation boolean Enable or disable changing orientation based on EXIF
+---@field apply_raw_wb boolean Should camera white balance be applied to raw images
 ---Enable or disable window decoration (title, border, buttons).
 ---Available only in Wayland, the corresponding protocol must be
 ---supported by the composer.
@@ -342,10 +343,7 @@ function mode_base.get_mappings() end
 swi.viewer = {}
 
 do
-	---Open the file at the specified path.
-	---Since 5.2.
-	---
-	---This function adds a file to the image list and then opens it in the viewer.
+	---Add a file to the image list and select it.
 	---@param path string Path to the file
 	function swi.viewer.open(path) end
 
