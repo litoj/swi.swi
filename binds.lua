@@ -1,6 +1,6 @@
 ---@module 'swi.binds'
 
-local U = require 'swi.utils'
+local U = require 'swi.lib.utils'
 
 local M = {}
 
@@ -115,12 +115,12 @@ function M.default()
 		local s = v.get_abs_scale() * 1.1
 		local m = swi.get_mouse_pos()
 		v.scale_centered(s, m.x, m.y)
-	end, 'Zoom in at pointer')
+	end, 'Zoom in on cursor')
 	map('v', 'Ctrl+ScrollDown', function()
 		local s = v.get_abs_scale() / 1.1
 		local m = swi.get_mouse_pos()
 		v.scale_centered(s, m.x, m.y)
-	end, 'Zoom out at pointer')
+	end, 'Zoom out at cursor')
 end
 
 return M

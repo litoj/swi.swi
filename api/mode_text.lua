@@ -1,7 +1,7 @@
 ---@module 'swi.api.mode_text'
 
-local U = require 'swi.utils'
-local proxy = require 'swi.api.proxy'
+local U = require 'swi.lib.utils'
+local proxy = require 'swi.lib.proxy'
 local e = require 'swi.api.eventloop'
 
 ---@class swi.api.mode_text: mode_base.text

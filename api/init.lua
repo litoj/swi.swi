@@ -1,7 +1,7 @@
 ---@diagnostic disable: invisible
----@module 'swi.api'
+---@module 'swi.api.init'
 
-local proxy = require 'swi.api.proxy'
+local proxy = require 'swi.lib.proxy'
 local e = require 'swi.api.eventloop'
 
 ---@type swi
@@ -80,7 +80,7 @@ M._overrides.mode = {
 }
 
 M._overrides.apply_raw_wb = {
-	set = function(self, v) self._api.set_format_params('raw', { auto_wb = v }) end,
+	set = function(self, v) self._api.set_format_params('raw', { camera_wb = v }) end,
 }
 
 -- ensure even the default keymappings trigger our events by redefining the defaults

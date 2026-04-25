@@ -2,7 +2,7 @@
 ---@module 'swi.api.viewer'
 
 local e = require 'swi.api.eventloop'
-local U = require 'swi.utils'
+local U = require 'swi.lib.utils'
 local mode_base = require 'swi.api.mode_base'
 
 ---@class swi.api.viewer: swi.viewer

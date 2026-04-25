@@ -1,4 +1,4 @@
-require 'swi.api'
+require 'swi.api.init'
 _G.e = swi.eventloop ---@type swi.eventloop
 _G.l = swi.imagelist ---@type swi.imagelist
 _G.t = swi.text ---@type swi.text

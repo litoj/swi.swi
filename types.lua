@@ -223,6 +223,34 @@ function swi.text.set_status(status) end
 -- Base mode class
 --------------------------------------------------------------------------------
 
+---@class keybind_processor
+local keybind_processor = {}
+
+---Map a keyboard or mouse event to an action.
+---@param bind string|string[] 1 or more mouse or keyboard events to map - `Alt+s`, etc.
+---@param action fun()|string callback function to run or shell command to execute
+---@param desc string? optional description of the action
+function keybind_processor.map(bind, action, desc) end
+
+---@param bind string keybind to disable
+function keybind_processor.unmap(bind) end
+
+---@class bindcfg
+---@field cb function|string the action that runs on the binding activation (or the shell command)
+---@field trace string where was the binding defined
+---@field desc? string optional description of the action
+---@field default? boolean is it the default swayimg bind
+
+---@param bind string
+---@param bindcfg bindcfg config to set the bind to
+---@return bindcfg? old_bind previous config set for this binding
+function keybind_processor.remap(bind, bindcfg) end
+
+---@alias mode_mappings table<string,bindcfg>
+
+---@return mode_mappings map of the user bindings
+function keybind_processor.get_mappings() end
+
 ---Extension to create event-based textlayer updates.
 ---When triggered, the callback gets evaluated and value set to its position in the text block.
 ---@class mode_base.text.dyntext: swi.eventloop.subscribe.opts
@@ -254,36 +282,11 @@ function swi.text.set_status(status) end
 ---@field bottomright extended_text_template[] Text layer scheme for bottom-right corner
 
 ---Base class providing text overlay layout fields shared by all display modes.
----@class mode_base: proxy
+---@class mode_base: proxy, keybind_processor
 ---@field text mode_base.text access to setting the overlay fields/indexes
 ---@field mark_color integer Mark icon color in ARGB format
 ---@field pinch_factor number how aggressive should the effect be
 local mode_base = {}
-
----Map a keyboard or mouse event to an action.
----@param bind string|string[] 1 or more mouse or keyboard events to map - `Alt+s`, etc.
----@param action fun()|string callback function to run or shell command to execute
----@param desc string? optional description of the action
-function mode_base.map(bind, action, desc) end
-
----@param bind string keybind to disable
-function mode_base.unmap(bind) end
-
----@param bind string
----@param mapping mapping config to set the bind to
----@return mapping? old_bind previous config set for this binding
-function mode_base.remap(bind, mapping) end
-
----@class mapping
----@field cb function|string the action that runs on the binding activation (or the shell command)
----@field trace string where was the binding defined
----@field desc? string optional description of the action
----@field default? boolean is it the default swayimg bind
-
----@alias mode_mappings table<string,mapping>
-
----@return mode_mappings map of the user bindings
-function mode_base.get_mappings() end
 
 --------------------------------------------------------------------------------
 -- Viewer mode
@@ -444,6 +447,6 @@ function swi.gallery.get_image() end
 
 ---@class swi.help: proxy
 ---@field enabled boolean
----@field pager swi.api.pager holds the scrolling position of the tab - .line, .page
+---@field pager swi.lib.pager holds the scrolling position of the tab - .line, .page
 ---@field tab integer which help tab are we on
 swi.help = {}

@@ -50,4 +50,4 @@ M._overrides = {
 	size = { set = set_size },
 }
 
-return require('swi.api.proxy').new(M)
+return require('swi.lib.proxy').new(M)

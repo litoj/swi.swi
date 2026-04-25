@@ -142,7 +142,7 @@ structure is declared in [types.lua](./types.lua)
 -- ~/.config/swayimg/init.lua
 -- makes the api accessible through the `swi` global variable
 -- you can also just save it to whatever you want
-require 'swi.api'
+require 'swi.api.init'
 -- or through first-letter globals (except: swi.imagelist -> `l` - not `i`)
 require 'swi.api.globals'
 

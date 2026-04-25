@@ -1,13 +1,14 @@
 ---@diagnostic disable: invisible
 ---@module 'swi.api.help'
 
-local pager = require 'swi.api.pager'
+local pager = require 'swi.lib.pager'
 local e = swi.eventloop
-local U = require 'swi.utils'
+local U = require 'swi.lib.utils'
 
 ---@class swi.api.help: swi.help
----@field pager swi.api.pager
----@field help_pager swi.api.pager
+---@field pager swi.lib.pager
+---@field help_pager swi.lib.pager
+---@field keybinder swi.lib.bind_override
 local M = {
 	_api = {},
 	_path = 'swi.help',
@@ -20,7 +21,7 @@ local M = {
 
 local modes = { 'gallery', 'viewer', 'slideshow' }
 
----@class KeymapItem: mapping
+---@class KeymapItem: bindcfg
 ---@field bind string the keycombo under which the callback is registered
 
 ---@param target proxy API object to inspect
@@ -214,8 +215,8 @@ local overlay_keybinds = {
 
 function M.activate(self)
 	if not rawget(M, 'pager') then
-		rawset(M, 'pager', pager.new(modes))
-		rawset(M, 'help_pager', pager.new(modes))
+		rawset(M, 'pager', pager.new())
+		rawset(M, 'help_pager', pager.new())
 		M.help_pager.position = 'topright'
 		M.help_pager.lines = (function()
 			local lines = {}
@@ -224,78 +225,67 @@ function M.activate(self)
 			end
 			return lines
 		end)()
-	end
-	self.pager.mode = swi.mode
-	self.help_pager.mode = swi.mode
 
-	self.tab = 1
-	-- Set help keybinds for all modes
-	---@type table<appmode_t,mode_mappings>
-	self._cache.keybinds = {}
-	for _, mode in ipairs(modes) do
-		---@type swi.api.mode_base
-		local api = swi[mode]
-		self._cache.keybinds[mode] = api.get_mappings()
+		-- Create the keybind overlay and register all help bindings
+		rawset(M, 'keybinder', require('swi.lib.bind_override').new())
 		for _, map in ipairs(overlay_keybinds) do
-			for _, key in ipairs(map.binds) do
-				api._set_raw_mapping(U.transform_key(key), map.cb)
-			end
+			M.keybinder.map(map.binds, map.cb, map.desc)
 		end
 	end
+	local mode = swi.mode
+	self.pager.mode = mode
+	self.help_pager.mode = mode
+	self.keybinder.mode = mode
 
+	self.tab = 1
+
+	do
+		local captured = U.capture_opt_changes()
+		swi.viewer.default_scale = 'keep_by_width'
+		swi.slideshow.default_scale = 'keep_by_width'
+		if mode ~= 'gallery' then
+			--- 100px
+			swi[mode].scale = 100 / swi[mode].get_image().width
+		end
+		local gspace = swi.gallery.thumb_size + swi.gallery.padding_size
+		swi.gallery.thumb_size = gspace / 3
+		swi.gallery.padding_size = gspace / 3
+		swi.text.enabled = true
+		self._cache.vars = captured()
+	end
+
+	-- NOTE: always ensure keybinder is updated last to load mode keybinds first
 	self._cache.mode_hook = e.subscribe {
 		event = 'ModeChanged',
 		mode = modes,
 		callback = function(ev)
 			self.pager:bulk_change(function(p)
-				p.mode = swi.mode
+				p.mode = ev.mode
 				self.tab = self.tab -- regenerate content in case we're on keybindings
 			end)
-			self.help_pager.mode = swi.mode
+			self.help_pager.mode = ev.mode
+			self.keybinder.mode = ev.mode
 		end,
 	}
 
-	local captured = U.capture_opt_changes()
-
-	swi.viewer.default_scale = 'keep_by_width'
-	if swi.mode == 'viewer' then
-		--- 100px
-		local img = swi.viewer.get_image()
-		swi.viewer.scale = 100 / math.min(img.width, img.height)
-	end
-	local gspace = swi.gallery.thumb_size + swi.gallery.padding_size
-	swi.gallery.thumb_size = gspace / 3
-	swi.gallery.padding_size = gspace / 3
-	swi.text.enabled = true
-
-	self._cache.vars = captured()
-
-	M.help_pager.enabled = true
 	M.pager.enabled = true
+	M.help_pager.enabled = true
+	M.keybinder.enabled = true
 end
 
 function M.deactivate(self)
 	M.pager.enabled = false
 	M.help_pager.enabled = false
 
-	if swi.mode ~= 'viewer' then self._cache.vars['swi.viewer.scale'] = nil end
-	U.restore_captured_changes(self._cache.vars)
+	local ovars = self._cache.vars
+	if swi.mode ~= 'viewer' then ovars['swi.viewer.scale'] = nil end
+	if swi.mode ~= 'slideshow' then ovars['swi.slideshow.scale'] = nil end
+	U.restore_captured_changes(ovars)
+	if swi.mode ~= 'gallery' then swi[swi.mode].scale = swi[swi.mode].default_scale end
 
 	e.unsubscribe { id = self._cache.mode_hook }
 
-	for _, mode in ipairs(modes) do
-		---@type swi.api.mode_base
-		---@diagnostic disable-next-line: assign-type-mismatch
-		local mapi = swi[mode] -- High-level API table for this mode
-
-		local orig = self._cache.keybinds[mode]
-		for _, map in ipairs(overlay_keybinds) do
-			for _, bind in ipairs(map.binds) do
-				local o = orig[bind]
-				mapi._set_raw_mapping(U.transform_key(bind), o and o.cb)
-			end
-		end
-	end
+	M.keybinder.enabled = false
 end
 
 M._overrides.enabled = {
@@ -314,6 +304,6 @@ M._overrides.enabled = {
 --- TODO: in the future: add ways to select a variable and list help and its possible values
 
 ---Enter or exit a custom mode that lists all bindings and other functions
-rawset(swi, 'help', require('swi.api.proxy').new(M))
+rawset(swi, 'help', require('swi.lib.proxy').new(M))
 ---@type swi.help
 return swi.help

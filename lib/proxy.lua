@@ -1,8 +1,8 @@
----@module 'swi.api.proxy'
+---@module 'swi.lib.proxy'
 
 local e = require 'swi.api.eventloop'
 
----@class swi.api.proxy: proxy
+---@class swi.lib.proxy: proxy
 local M = {}
 
 function M.__index(self, idx)

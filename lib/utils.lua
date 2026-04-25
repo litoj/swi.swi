@@ -1,4 +1,4 @@
----@module 'swi.utils'
+---@module 'swi.lib.utils'
 local M = {}
 
 ---@generic O
@@ -186,16 +186,26 @@ function M.pretty_trace(action_match, stacktrace)
 		:gsub('\n(%S)', '\n\t%1') -- indent continuing lines
 end
 
----@param path string
----@return false? false if operation failed due to incomplete path
-function M.set_var_by_path(path, new)
+function M.get_var_container(path)
 	local val = _G
 	for key in path:gmatch '([^.]+)%.' do
 		if val == nil then return false end
 		val = val[key]
 	end
+	return val
+end
+
+---@param path string
+---@return false? false if operation failed due to incomplete path
+function M.set_var_by_path(path, new)
+	local val = M.get_var_container(path)
+	if not val then return false end
 	val[path:match '[^.]+$'] = new
 end
+
+---@param path string
+---@return any
+function M.get_var_by_path(path) return M.get_var_container(path)[path:match '[^.]+$'] end
 
 ---@param ptn string|string[]? event pattern to specify which exact options to watch for
 ---@return fun():table<string,{old:any,new:any}> reclaimer call it to finish collection of option changes
@@ -204,8 +214,10 @@ function M.capture_opt_changes(ptn)
 	local hook_id = e.subscribe {
 		event = 'OptionSet',
 		pattern = ptn,
-		---@diagnostic disable-next-line: undefined-field
-		callback = function(ev) t[ev.match] = { old = ev.old_data, new = ev.data } end,
+		callback = function(ev)
+			---@diagnostic disable-next-line: undefined-field
+			t[ev.match] = { old = ev.old_data, new = ev.data }
+		end,
 	}
 	return function()
 		e.unsubscribe { event = 'OptionSet', id = hook_id }
@@ -217,7 +229,7 @@ end
 ---@param captured table<string,{old:any,new:any}> captured changes from capture_opt_changes()
 function M.restore_captured_changes(captured)
 	for path, state in pairs(captured) do
-		M.set_var_by_path(path, state.old)
+		if state.old ~= nil then M.set_var_by_path(path, state.old) end
 	end
 end
 

@@ -1,6 +1,6 @@
 ---@module 'swi.api.eventloop'
 
-local U = require 'swi.utils'
+local U = require 'swi.lib.utils'
 local tabled = U.tabled
 
 ---@private

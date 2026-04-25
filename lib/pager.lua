@@ -1,12 +1,12 @@
 ---@diagnostic disable: invisible
----@module 'swi.api.pager'
+---@module 'swi.lib.pager'
 
 local e = swi.eventloop
-local proxy = require 'swi.api.proxy'
-local U = require 'swi.utils'
+local proxy = require 'swi.lib.proxy'
+local U = require 'swi.lib.utils'
 
 -- Paging object to manage scrollable output
----@class swi.api.pager: proxy
+---@class swi.lib.pager: proxy
 ---@field mode appmode_t in which mode should we set the data
 ---@field position block_position_t where should we output to
 ---@field title string title in the non-scrollable header
@@ -161,7 +161,7 @@ function M:recalibrate(resize, reset)
 end
 
 ---Make multiple changes simultaneously and render only once at the end.
----@param applicator fun(it:swi.api.pager)
+---@param applicator fun(it:swi.lib.pager)
 function M:bulk_change(applicator)
 	if not self._enabled then return applicator(self) end
 	---@type false|fun(self,val):boolean?
@@ -186,7 +186,7 @@ function M:bulk_change(applicator)
 end
 
 M._overrides.mode = {
-	---@param self swi.api.pager
+	---@param self swi.lib.pager
 	---@param mode appmode_t
 	set = function(self, mode)
 		self:_restore_original()
@@ -195,12 +195,12 @@ M._overrides.mode = {
 		return false
 	end,
 	get = function(self)
-		return ({ [swi.viewer.text] = 'viewer', [swi.slideshow.text] = 'slideshow', [swi.gallery.text] = 'gallery' })[self._mode]
+		return ({ [swi.viewer.text] = 'viewer', [swi.slideshow.text] = 'slideshow', [swi.gallery.text] = 'gallery' })[self._mode_text]
 	end,
 }
 
 M._overrides.position = {
-	---@param self swi.api.pager
+	---@param self swi.lib.pager
 	---@param position block_position_t
 	set = function(self, position)
 		self:_restore_original()
@@ -211,7 +211,7 @@ M._overrides.position = {
 }
 
 M._overrides.title = {
-	---@param self swi.api.pager
+	---@param self swi.lib.pager
 	---@param title string
 	set = function(self, title)
 		self._title = title
@@ -220,7 +220,7 @@ M._overrides.title = {
 }
 
 M._overrides.lines = {
-	---@param self swi.api.pager
+	---@param self swi.lib.pager
 	---@param lines string[]
 	set = function(self, lines)
 		self._lines = lines
@@ -230,7 +230,7 @@ M._overrides.lines = {
 }
 
 M._overrides.line = {
-	---@param self swi.api.pager
+	---@param self swi.lib.pager
 	---@param linenr integer
 	set = function(self, linenr)
 		if #self._lines == 0 then return false end
@@ -245,7 +245,7 @@ M._overrides.line = {
 }
 
 M._overrides.page = {
-	---@param self swi.api.pager
+	---@param self swi.lib.pager
 	---@param pagenr integer
 	set = function(self, pagenr)
 		self._overrides.line.set(self, (pagenr - 1) * self._page_size + 1)
@@ -254,7 +254,7 @@ M._overrides.page = {
 }
 
 M._overrides.enabled = {
-	---@param self swi.api.pager
+	---@param self swi.lib.pager
 	set = function(self, val)
 		if val == self._enabled then return end
 		self._enabled = val
@@ -285,8 +285,7 @@ M._overrides.enabled = {
 	end,
 }
 
----@param modes appmode_t|appmode_t[] in which modes are we allowed to change content
----@return swi.api.pager
-function M.new(modes) return proxy.new(U.soft_copy(M)) end
+---@return swi.lib.pager
+function M.new() return proxy.new(U.soft_copy(M)) end
 
 return M
