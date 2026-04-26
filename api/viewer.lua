@@ -4,10 +4,12 @@
 local e = require 'swi.api.eventloop'
 local U = require 'swi.lib.utils'
 local mode_base = require 'swi.api.mode_base'
+local mode_text = require 'swi.api.mode_text'
 
----@class swi.api.viewer: swi.viewer
+---@class swi.api.viewer: swi.viewer, swi.api.mode_base
 ---@field _api swayimg.viewer
 ---@field _last {w:integer,h:integer,x:integer,y:integer}|false
+---@field text swi.api.mode_text
 local M = {}
 
 function M.new_step(self)
@@ -46,7 +48,7 @@ function M.set_default_scale(self, x)
 		self._last = { w = 0, h = 0, x = 0, y = 0 }
 		e.subscribe {
 			event = 'ImgChangePre',
-			pattern = self._path:sub(5),
+			mode = self.text._api_name,
 			group = '_cust_default_scale',
 			callback = function(state)
 				local i = state.data
@@ -57,7 +59,7 @@ function M.set_default_scale(self, x)
 			end,
 		}
 	else
-		e.unsubscribe { group = '_cust_default_scale', match = self._path:sub(5) }
+		e.unsubscribe { group = '_cust_default_scale', match = self.text._api_name }
 		self._last = false
 	end
 	self._api.set_default_scale(x)
@@ -93,6 +95,7 @@ function M.set_img_bg(self, x)
 end
 
 ---@param api_name 'viewer'|'slideshow'
+---@return swi.viewer|swi.slideshow
 function M.new(api_name)
 	local api = swayimg[api_name] ---@type swayimg.viewer
 	---@type swi.api.viewer
@@ -105,11 +108,46 @@ function M.new(api_name)
 		_loop = true,
 		_default_position = 'center',
 		_image_background = { 0xff333333, 0xff4c4c4c, size = 20 }, -- chessboard
-
-		_default_scale = api_name == 'viewer' and 'optimal' or 'fit',
-		_window_background = api_name == 'viewer' and 0xff000000 or 'auto',
-		_history_limit = api_name == 'viewer' and 1 or 0,
 	}
+
+	---@diagnostic disable: inject-field
+	if api_name == 'viewer' then
+		self._default_scale = 'optimal'
+		self._window_background = 0xff000000
+		self._history_limit = 1
+		self.text = mode_text.new {
+			_api = api,
+			_api_name = api_name,
+			_topleft = {
+				'File:\t{name}',
+				'Format:\t{format}',
+				'File size:\t{sizehr}',
+				'File time:\t{time}',
+				'EXIF date:\t{meta.Exif.Photo.DateTimeOriginal}',
+				'EXIF camera:\t{meta.Exif.Image.Model}',
+			},
+			_topright = {
+				'Image:\t{list.index} of {list.total}',
+				'Frame:\t{frame.index} of {frame.total}',
+				'Size:\t{frame.width}x{frame.height}',
+			},
+			_bottomleft = { 'Scale: {scale}' },
+			_bottomright = {},
+		}
+	else
+		self._default_scale = 'fit'
+		self._window_background = 'auto'
+		self._history_limit = 0
+		self.text = mode_text.new {
+			_api = api,
+			_api_name = api_name,
+			_topleft = {},
+			_topright = { '{name}' },
+			_bottomleft = {},
+			_bottomright = {},
+		}
+	end
+	---@diagnostic enable: inject-field
 
 	self.get_abs_scale = api.get_scale
 	self.go = M.new_go(api)
@@ -119,9 +157,9 @@ function M.new(api_name)
 		rawset(self, '_scale', s)
 	end
 	self.open = function(path)
-		e.trigger { event = 'ImgChangePre', match = api_name, data = U.lazy(api.get_image) }
+		e.trigger { event = 'ImgChangePre', mode = api_name, match = api_name, data = U.lazy(api.get_image) }
 		api.open(path)
-		e.trigger { event = 'OptionSet', match = 'swi.imagelist.size', data = swi.imagelist.size() }
+		e.trigger { event = 'OptionSet', mode = api_name, match = 'swi.imagelist.size', data = swi.imagelist.size() }
 	end
 
 	self._overrides = {
@@ -170,30 +208,7 @@ function M.new(api_name)
 		api.set_abs_position(last.x, last.y)
 	end)
 
-	self = mode_base.new(self, api_name)
-
-	if api_name == 'viewer' then
-		rawset(self.text, '_topleft', {
-			'File:\t{name}',
-			'Format:\t{format}',
-			'File size:\t{sizehr}',
-			'File time:\t{time}',
-			'EXIF date:\t{meta.Exif.Photo.DateTimeOriginal}',
-			'EXIF camera:\t{meta.Exif.Image.Model}',
-		})
-		rawset(self.text, '_topright', {
-			'Image:\t{list.index} of {list.total}',
-			'Frame:\t{frame.index} of {frame.total}',
-			'Size:\t{frame.width}x{frame.height}',
-		})
-		rawset(self.text, '_bottomleft', { 'Scale: {scale}' })
-		rawset(self.text, '_bottomright', {})
-	else
-		rawset(self.text, '_topleft', {})
-		rawset(self.text, '_topright', { '{name}' })
-		rawset(self.text, '_bottomleft', {})
-		rawset(self.text, '_bottomright', {})
-	end
+	self = mode_base.new(self, api_name) ---@type swi.api.viewer
 
 	return self
 end

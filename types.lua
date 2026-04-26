@@ -16,7 +16,7 @@
 ---@field protected _overrides {['*']:override?, [string]:override}
 ---@field protected _path string object path to this new api (swi.xxx) or just a name for errors
 ---@field protected _api table the api that we are replacing and redirecting calls to
----@field protected _trigger boolean trigger events on setting a field (default: true)
+---@field protected _trigger boolean? trigger events on setting a field (default: true)
 
 --------------------------------------------------------------------------------
 -- Main application class
@@ -79,7 +79,7 @@ function swi.set_window_size(width, height) end
 
 ---@alias event_name_t
 ---| "ImgChange" # after selected image has changed, match: mode, data: new image
----| "ImgChangePre" # just before selecting a different image, math: mode, data: old image
+---| "ImgChangePre" # just before selecting a different image, match: mode, data: old image
 ---| "OptionSet" # after setting any option in the api, match: opt object path, data: opt value
 ---| "ShellCmdPost" # after swi.exec, match: cmd, data: output
 ---| "ModeChanged" # match: 'o:n' as in old:new, mode: new mode, data: old mode
@@ -246,9 +246,9 @@ function keybind_processor.unmap(bind) end
 ---@return bindcfg? old_bind previous config set for this binding
 function keybind_processor.remap(bind, bindcfg) end
 
----@alias mode_mappings table<string,bindcfg>
+---@alias bind_map table<string,bindcfg>
 
----@return mode_mappings map of the user bindings
+---@return bind_map map of the user bindings
 function keybind_processor.get_mappings() end
 
 ---Extension to create event-based textlayer updates.
@@ -445,7 +445,10 @@ function swi.gallery.switch_image(dir) end
 ---@return swayimg.entry # Currently selected image entry
 function swi.gallery.get_image() end
 
----@class swi.help: proxy
+---Reload thumbnails.
+function swi.gallery.reload() end
+
+---@class swi.help: proxy, keybind_processor
 ---@field enabled boolean
 ---@field pager swi.lib.pager holds the scrolling position of the tab - .line, .page
 ---@field tab integer which help tab are we on

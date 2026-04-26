@@ -17,6 +17,7 @@ local l = swi.imagelist
 ---| '' # slideshow and viewer modes
 ---| 'a' # all modes
 
+---@type {[string]:{[integer]:swi.lib.keybind_processor|keybind_processor}}
 local modemap = { [''] = { v, s }, a = { v, s, g }, g = { g }, v = { v }, s = { s } }
 
 ---@param mode bindmode
@@ -29,23 +30,31 @@ function M.map(mode, binds, cb, desc)
 	end
 end
 
-function M.default()
+function M.late_init_default()
+	local deftrace = U.pretty_trace('default', debug.traceback())
 	local function map(mode, binds, cb, desc)
+		local cfg = { cb = cb, desc = desc, default = true, trace = deftrace, _traced = true }
 		for _, m in ipairs(modemap[mode]) do
 			for _, b in ipairs(U.tabled(binds)) do
-				---@diagnostic disable-next-line: missing-fields
-				m.remap(b, { cb = cb, desc = desc, default = true })
+				if not m._mappings[b] then
+					m._mappings[b] = cfg
+					m:_rawmap(b, cb)
+				end
 			end
 		end
 	end
 
 	-- Custom keybind for our own help mode
-	map(
-		'a',
-		{ 'F1', 'h' },
-		function() require('swi.api.help').enabled = not require('swi.api.help').enabled end,
-		'Toggle help'
-	)
+	local h = require 'swi.api.help'
+	modemap['h'] = { h }
+	map('a', { 'F1', 'h' }, function() h.enabled = not h.enabled end, 'Toggle help')
+	map('h', { 'Right', 'Tab' }, function() h.tab = h.tab + 1 end, 'Next help tab')
+	map('h', { 'Left', 'Shift+ISO_Left_Tab' }, function() h.tab = h.tab - 1 end, 'Previous help tab')
+	map('h', { 'Up', 'ScrollUp' }, function() h.pager.line = h.pager.line - 1 end, 'Scroll up')
+	map('h', { 'Down', 'ScrollDown' }, function() h.pager.line = h.pager.line + 1 end, 'Scroll down')
+	map('h', 'Prior', function() h.pager.line = h.pager.line - h.pager.page_size end, 'Page up')
+	map('h', 'Next', function() h.pager.line = h.pager.line + h.pager.page_size end, 'Page down')
+	map('h', { 'Escape', 'q' }, function() h.enabled = false end, 'Exit help overlay')
 
 	-- Global keybinds
 	map('a', 'Return', function() swi.mode = swi.mode == 'gallery' and 'viewer' or 'gallery' end, 'Toggle viewer')
@@ -59,57 +68,60 @@ function M.default()
 	-- scale
 	map(
 		'g',
-		{ '=', '+', 'Ctrl+ScrollUp' },
+		{ 'equal', 'Shift+plus', 'Ctrl+ScrollUp' },
 		function() g.thumb_size = math.floor(g.thumb_size * 1.1 + 0.5) end,
 		'Increase thumbnail size'
 	)
 	map(
 		'g',
-		{ '-', 'Ctrl+ScrollDown' },
+		{ 'minus', 'Ctrl+ScrollDown' },
 		function() g.thumb_size = math.floor(g.thumb_size / 1.1 + 0.5) end,
 		'Decrease thumbnail size'
 	)
 	-- image selection
-	map('g', 'Home', g.go.first, 'Select first thumbnail')
-	map('g', 'End', g.go.last, 'Select last thumbnail')
-	map('g', { 'Left', 'ScrollLeft' }, g.go.left, 'Select thumbnail left')
-	map('g', { 'Right', 'ScrollRight' }, g.go.right, 'Select thumbnail right')
-	map('g', { 'Up', 'ScrollUp' }, g.go.up, 'Select thumbnail up')
-	map('g', { 'Down', 'ScrollDown' }, g.go.down, 'Select thumbnail down')
-	map('g', 'PageDown', g.go.pgdown, 'Page down in thumbnails')
-	map('g', 'PageUp', g.go.pgup, 'Page up in thumbnails')
+	local ggo = g.go
+	map('g', 'Home', ggo.first, 'Go first')
+	map('g', 'End', ggo.last, 'Go last')
+	map('g', { 'Left', 'ScrollLeft' }, ggo.left, 'Go left')
+	map('g', { 'Right', 'ScrollRight' }, ggo.right, 'Go right')
+	map('g', { 'Up', 'ScrollUp' }, ggo.up, 'Go up')
+	map('g', { 'Down', 'ScrollDown' }, ggo.down, 'Go down')
+	map('g', 'Next', ggo.pgdown, 'Page down')
+	map('g', 'Prior', ggo.pgup, 'Page up')
 	-- text layer
-	map('g', 't', function() t.enabled = not t.enabled end, 'Toggle text overlay')
+	map('g', 't', function() t.enabled = not t.enabled end, 'Toggle text')
 	-- mouse bindings as keys
-	map('g', 'MouseLeft', function() swi.mode = 'viewer' end, 'Switch to viewer mode with left mouse button')
+	map('g', 'MouseLeft', function() swi.mode = 'viewer' end, 'Switch to viewer')
 
 	-- Viewer
 	-- Image transforms
-	map('v', '[', function() v.rotate(270) end, 'Rotate image 270° (left)')
-	map('v', ']', function() v.rotate(90) end, 'Rotate image 90° (right)')
-	map('v', 'm', v.flip_vertical, 'Flip image vertically')
-	map('v', 'Shift+m', v.flip_horizontal, 'Flip image horizontally')
+	map('v', 'bracketleft', function() v.rotate(270) end, 'Rotate left')
+	map('v', 'bracketright', function() v.rotate(90) end, 'Rotate right')
+	map('v', 'm', v.flip_vertical, 'Flip vertical')
+	map('v', 'Shift+m', v.flip_horizontal, 'Flip horizontal')
 	-- Text overlay toggle
-	map('v', 't', function() t.enabled = not t.enabled end, 'Toggle text overlay')
+	map('v', 't', function() t.enabled = not t.enabled end, 'Toggle text')
 	-- Image navigation
-	map('v', 'PageDown', v.go.prev, 'Next image')
-	map('v', 'PageUp', v.go.next, 'Previous image')
+	map('v', 'Home', v.go.first, 'Go first')
+	map('v', 'End', v.go.last, 'Go last')
+	map('v', 'Next', v.go.next, 'Go next')
+	map('v', 'Prior', v.go.prev, 'Go prev')
 	-- Frame navigation
-	map('v', 'Shift+PageDown', v.next_frame, 'Next frame')
-	map('v', 'Shift+PageUp', v.prev_frame, 'Previous frame')
+	map('v', 'Shift+Next', v.next_frame, 'Next frame')
+	map('v', 'Shift+Prior', v.prev_frame, 'Previous frame')
 	-- Scale (zoom)
-	map('v', { '=', '+', 'Ctrl+ScrollUp' }, function() v.scale = v.get_abs_scale() * 1.1 end, 'Zoom in')
-	map('v', { '-', 'Ctrl+ScrollDown' }, function() v.scale = v.get_abs_scale() / 1.1 end, 'Zoom out')
+	map('v', { 'equal', 'Shift+plus', 'Ctrl+ScrollUp' }, function() v.scale = v.get_abs_scale() * 1.1 end, 'Zoom in')
+	map('v', { 'minus', 'Ctrl+ScrollDown' }, function() v.scale = v.get_abs_scale() / 1.1 end, 'Zoom out')
 	map('v', 'BackSpace', v.reset, 'Reset scale and position')
 	-- Image position / panning
-	map('v', 'Left', v.step.left, 'Move left')
-	map('v', 'Right', v.step.right, 'Move right')
-	map('v', 'Up', v.step.up, 'Move up')
-	map('v', 'Down', v.step.down, 'Move down')
-	map('v', 'ScrollUp', function() v.step.up(20) end, 'Pan up')
-	map('v', 'ScrollDown', function() v.step.down(20) end, 'Pan down')
-	map('v', 'ScrollLeft', function() v.step.left(20) end, 'Pan left')
-	map('v', 'ScrollRight', function() v.step.right(20) end, 'Pan right')
+	map('v', 'Left', v.step.left, 'Pan left')
+	map('v', 'Right', v.step.right, 'Pan right')
+	map('v', 'Up', v.step.up, 'Pan up')
+	map('v', 'Down', v.step.down, 'Pan down')
+	map('v', 'ScrollUp', function() v.step.up(20) end, 'Pan up 20px')
+	map('v', 'ScrollDown', function() v.step.down(20) end, 'Pan down 20px')
+	map('v', 'ScrollLeft', function() v.step.left(20) end, 'Pan left 20px')
+	map('v', 'ScrollRight', function() v.step.right(20) end, 'Pan right 20px')
 	-- Mouse zoom (centered at pointer)
 	map('v', 'Ctrl+ScrollUp', function()
 		local s = v.get_abs_scale() * 1.1

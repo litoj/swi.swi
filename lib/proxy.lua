@@ -35,6 +35,8 @@ function M.__newindex(self, idx, val)
 			rawset(self, '_' .. idx, val)
 			---@diagnostic disable-next-line: cast-local-type
 			fn = true
+		elseif fn then
+			val = self['_' .. idx]
 		end
 	else
 		fn = type(val) == 'boolean' and self._api['enable_' .. idx] or self._api['set_' .. idx]
@@ -53,7 +55,7 @@ end
 ---Practically a metatable designed for automatic passthrough to a different api.
 ---@generic O: proxy
 ---@param base `O`
----@return O
+---@return O base
 function M.new(base)
 	---@diagnostic disable-next-line: inject-field
 	if not base._api then base._api = {} end

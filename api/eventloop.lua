@@ -186,32 +186,4 @@ function M.trigger(state)
 	end)
 end
 
-swayimg.on_initialized(function()
-	-- an error occured during config loading so we don't want to change the message
-	if not swi then return print 'error - swi not initialized during on_initialized' end
-	swi.initialized = true
-	M.trigger { event = 'SwiEnter' }
-
-	if M._hooks.SwiEnter then
-		M._hooks.SwiEnter = nil
-
-		-- easteregg
-		local p = io.popen 'date +%d%m' or {}
-		local o = p:read '*a'
-		p:close()
-		if o == '1003\n' then print [[Naughty, naughty! Didn't clean those hookers today...]] end
-	end
-
-	M.subscribe {
-		event = 'Subscribed',
-		pattern = 'SwiEnter',
-		-- ensure all hooks expecting initialization get loaded
-		-- (especially the lazy ones not checking swi.initialized)
-		callback = function(h)
-			h.data.callback()
-			M._hooks.SwiEnter = nil
-		end,
-	}
-end)
-
 return M

@@ -1,133 +1,85 @@
 ---@diagnostic disable: invisible
 ---@module 'swi.api.help'
 
-local pager = require 'swi.lib.pager'
 local e = swi.eventloop
+local proxy = require 'swi.lib.proxy'
+local pager = require 'swi.lib.pager'
 local U = require 'swi.lib.utils'
 
 ---@class swi.api.help: swi.help
----@field pager swi.lib.pager
----@field help_pager swi.lib.pager
----@field keybinder swi.lib.bind_override
 local M = {
-	_api = {},
 	_path = 'swi.help',
+	_api = {},
 	_overrides = {},
 	_cache = {},
+
 	_tab = 1,
 	_enabled = false,
-	key_alignment = 15,
+
+	bind_fmt = '%20s: %s',
+}
+
+---@diagnostic disable-next-line: missing-fields
+M.pager = pager.new {
+	_path = 'swi.help.pager',
+	_trigger = true,
+	position = 'topleft',
+}
+
+---@diagnostic disable-next-line: missing-fields
+M.help_pager = pager.new {
+	title = 'Help binds:\t',
+	position = 'topright',
+}
+
+-- To defer user mapping override handling
+M.bind_override = require('swi.lib.bind_override').new {
+	_path = 'swi.help',
 }
 
 local modes = { 'gallery', 'viewer', 'slideshow' }
 
----@class KeymapItem: bindcfg
----@field bind string the keycombo under which the callback is registered
-
----@param target proxy API object to inspect
----@return table<string,any>[] fields List of settable fields with their current values
-local function discover_settable_fields(target)
-	local raw_api = target._api
-	local overrides = target._overrides
-	local fields = {}
-
-	for field, value in pairs(target) do
-		if field:sub(1, 1) == '_' then
-			local field_name = field:sub(2)
-			local setter_name = 'set_' .. field_name
-			local enabler_name = 'enable_' .. field_name
-
-			-- Check if backing field has an official setter, enabler, or override
-			if
-				(raw_api and (raw_api[setter_name] or raw_api[enabler_name]))
-				or (overrides and overrides[field_name])
-			then
-				fields[#fields + 1] = { name = field_name, value = value }
-			end
-		end
-	end
-
-	return fields
-end
-
----Gather all key mappings in the application by mode
----@param mode_names appmode_t|appmode_t[]?
----@return table<appmode_t,KeymapItem[]> sections Map of mode names to their key bindings
-local function gather_keymaps(mode_names)
-	local result = {}
-	for _, name in ipairs(U.tabled(mode_names) or modes) do
-		local items = {}
-		for k, v in pairs(swi[name].get_mappings()) do
-			v = U.soft_copy(v)
-			v.bind = k
-			items[#items + 1] = v
-		end
-		table.sort(items, function(a, b)
-			if not a.desc ~= not b.desc then return not b.desc end
-			if not a.desc and type(a.cb) ~= type(b.cb) then return type(a.cb) == 'string' end
-			return #a.trace < #b.trace or (#a.trace == #b.trace and a.trace < b.trace)
-		end)
-		result[name] = items
-	end
-	return result
-end
-
----Gather all settings/configuration variables
----@return {name:string,list:{name:string,value:string}} sections List of all setting sections with their variables
-local function gather_settings()
-	-- Dynamically find settings based on setter methods and overrides
-	local targets = {
-		swi,
-		swi.text,
-		swi.imagelist,
-		swi.gallery,
-		swi.viewer,
-		swi.slideshow,
-	}
-	local result = {}
-	for _, swiapi in ipairs(targets) do
-		local list = {}
-
-		local settable_fields = discover_settable_fields(swiapi)
-
-		for _, field in ipairs(settable_fields) do
-			list[#list + 1] = { name = field.name, value = U.to_pretty_str(field.value):gsub('{', '{{') }
-		end
-
-		if #list > 0 then result[#result + 1] = { name = swiapi._path, list = list } end
-	end
-	return result
-end
-
--- Overlay tabs definition: each with a name and provider function
-local function mode_bindlist(mode)
+---@return string title
+---@return string[] lines
+local function mode_bindlist(mode, fmt_str)
 	mode = mode or swi.mode
-	local function get_desc(item) return item.desc or (type(item.cb) == 'string' and item.cb) or item.trace end
 
-	local fmt = ('  %%%ds: %%s'):format(M.key_alignment)
-	local out = {}
-	local binds = gather_keymaps(mode)[mode]
-	if #binds > 0 then
-		local i = 1
-		local item = binds[i]
-		local last = { item.trace, { U.short_key_name(item.bind) }, get_desc(item) }
-		while i < #binds do -- group bindings by what they bind to
-			i = i + 1
-			item = binds[i]
-			if last[1] ~= item.trace then
-				out[#out + 1] = (fmt):format(table.concat(last[2], ', '), last[3]:gsub('\t', ''):gsub('\n', ' '))
-
-				last = { item.trace, {}, get_desc(item) }
-			end
-			last[2][#last[2] + 1] = item.bind --U.short_key_name(item.bind)
+	local binds = {}
+	for k, v in pairs(swi[mode].get_mappings()) do ---@cast v bindcfg
+		if not binds[v.cb] then
+			binds[v.cb] = {
+				bind = {},
+				info = v.desc or (type(v.cb) == 'string' and v.cb) or v.trace,
+				-- quality of the source information
+				qual = v.default and 0 or (v.desc and 1) or (type(v.cb) == 'string' and 2) or 3,
+			}
 		end
+		table.insert(binds[v.cb].bind, k)
+	end
 
-		out[#out + 1] = ('  %20s %s'):format(table.concat(last[2], ', '), last[3]:gsub('[\t\n]', ' '))
+	local out = {}
+	for _, v in pairs(binds) do
+		out[#out + 1] = v
+	end
+	binds = out
+	table.sort(binds, function(a, b)
+		if a.qual ~= b.qual then return a.qual < b.qual end
+		if a.qual < 3 then return a.info < b.info end
+		return #a.info < #b.info or (#a.info == #b.info and a.info < b.info)
+	end)
+
+	if not fmt_str then fmt_str = M.bind_fmt end
+	out = {}
+	for _, k in ipairs(binds) do
+		table.sort(k.bind, function(a, b) return #a < #b or (#a == #b and a < b) end)
+		out[#out + 1] = (fmt_str):format(table.concat(k.bind, ', '), k.info:gsub('[\t\n]', ' '))
 	end
 
 	return ('%s%s Binds'):format(mode:sub(1, 1):upper(), mode:sub(2)), out
 end
 
+---@return string title
+---@return string[] lines
 local function complete_bindlist()
 	local mode_order = { swi.mode }
 	for _, m in ipairs(modes) do
@@ -146,15 +98,48 @@ local function complete_bindlist()
 	return 'All Binds', out
 end
 
-local function settings_list()
-	local out = {}
-	-- First pass: collect lines + track selected index mapping
-	for i, sec in ipairs(gather_settings()) do
-		out[#out + 1] = ('%s:'):format(sec.name:upper())
-		for j, v in ipairs(sec.list) do
-			out[#out + 1] = ('  %s\t{%s.%s}'):format(v.name, sec.name, v.name)
+---@param target proxy API object to inspect
+---@return table<string,any>[] fields List of settable fields with their current values
+local function discover_settable_fields(target)
+	local raw_api = target._api
+	local overrides = target._overrides
+	local fields = {}
+
+	for field, value in pairs(target) do
+		if field:sub(1, 1) == '_' then
+			local field_name = field:sub(2)
+			local setter_name = 'set_' .. field_name
+			local enabler_name = 'enable_' .. field_name
+
+			-- Check if backing field has an official setter, enabler, or override
+			if overrides[field_name] or raw_api[setter_name] or raw_api[enabler_name] then
+				fields[#fields + 1] = { name = field_name, value = value }
+			end
 		end
 	end
+
+	return fields
+end
+
+---@return string title
+---@return string[]
+local function settings_list()
+	local out = {}
+	for _, swiapi in ipairs {
+		swi,
+		swi.text,
+		swi.imagelist,
+		swi.gallery,
+		swi.viewer,
+		swi.slideshow,
+	} do
+		out[#out + 1] = ('%s:'):format(swiapi._path:upper())
+
+		for _, field in ipairs(discover_settable_fields(swiapi)) do
+			out[#out + 1] = ('  %s\t{%s.%s}'):format(field.name, swiapi._path, field.name)
+		end
+	end
+
 	return 'Settings', out
 end
 
@@ -174,69 +159,14 @@ M._overrides.tab = {
 	end,
 }
 
--- Overlay navigation and exit bindings (add scroll)
-local overlay_keybinds = {
-	{
-		binds = { 'Right', 'Tab' },
-		cb = function() swi.help.tab = swi.help.tab + 1 end,
-		desc = 'Next help tab',
-	},
-	{
-		binds = { 'Left', 'Shift+Tab' },
-		cb = function() swi.help.tab = swi.help.tab - 1 end,
-		desc = 'Previous help tab',
-	},
-	{
-		binds = { 'Up', '<UMS>' },
-		cb = function() swi.help.pager.line = swi.help.pager.line - 1 end,
-		desc = 'Scroll up',
-	},
-	{
-		binds = { 'Down', '<DMS>' },
-		cb = function() swi.help.pager.line = swi.help.pager.line + 1 end,
-		desc = 'Scroll down',
-	},
-	{
-		binds = { 'PageUp' },
-		cb = function() swi.help.pager.line = swi.help.pager.line - swi.help.pager.page_size end,
-		desc = 'Page up',
-	},
-	{
-		binds = { 'PageDown' },
-		cb = function() swi.help.pager.line = swi.help.pager.line + swi.help.pager.page_size end,
-		desc = 'Page down',
-	},
-	{
-		binds = { 'Escape', 'q' },
-		cb = function() swi.help.enabled = false end,
-		desc = 'Exit help overlay',
-	},
-}
-
 function M.activate(self)
-	if not rawget(M, 'pager') then
-		rawset(M, 'pager', pager.new())
-		rawset(M, 'help_pager', pager.new())
-		M.help_pager.position = 'topright'
-		M.help_pager.lines = (function()
-			local lines = {}
-			for _, k in ipairs(overlay_keybinds) do
-				lines[#lines + 1] = ('%s\t%s'):format(table.concat(k.binds, ', '), k.desc)
-			end
-			return lines
-		end)()
-
-		-- Create the keybind overlay and register all help bindings
-		rawset(M, 'keybinder', require('swi.lib.bind_override').new())
-		for _, map in ipairs(overlay_keybinds) do
-			M.keybinder.map(map.binds, map.cb, map.desc)
-		end
-	end
 	local mode = swi.mode
 	self.pager.mode = mode
 	self.help_pager.mode = mode
-	self.keybinder.mode = mode
+	self.bind_override.mode = mode
 
+	---@diagnostic disable-next-line: param-type-mismatch
+	_, self.help_pager.lines = mode_bindlist('help', '%s\t%s')
 	self.tab = 1
 
 	do
@@ -264,18 +194,19 @@ function M.activate(self)
 				self.tab = self.tab -- regenerate content in case we're on keybindings
 			end)
 			self.help_pager.mode = ev.mode
-			self.keybinder.mode = ev.mode
+			self.bind_override.mode = ev.mode
 		end,
 	}
 
 	M.pager.enabled = true
 	M.help_pager.enabled = true
-	M.keybinder.enabled = true
+	M.bind_override.enabled = true
 end
 
 function M.deactivate(self)
 	M.pager.enabled = false
 	M.help_pager.enabled = false
+	M.bind_override.enabled = false
 
 	local ovars = self._cache.vars
 	if swi.mode ~= 'viewer' then ovars['swi.viewer.scale'] = nil end
@@ -284,26 +215,27 @@ function M.deactivate(self)
 	if swi.mode ~= 'gallery' then swi[swi.mode].scale = swi[swi.mode].default_scale end
 
 	e.unsubscribe { id = self._cache.mode_hook }
-
-	M.keybinder.enabled = false
 end
 
 M._overrides.enabled = {
 	---@param self swi.api.help
 	set = function(self, val)
-		if val == self._enabled then return end
+		if val == self._enabled then return true end
 		if val then
 			self:activate()
 		else
 			self:deactivate()
 		end
-		self._enabled = val
 	end,
 }
 
 --- TODO: in the future: add ways to select a variable and list help and its possible values
 
----Enter or exit a custom mode that lists all bindings and other functions
-rawset(swi, 'help', require('swi.lib.proxy').new(M))
+for k, v in pairs(M.bind_override) do
+	if M[k] == nil then M[k] = v end
+end
+
+rawset(swi, 'help', proxy.new(M))
+
 ---@type swi.help
 return swi.help

@@ -4,9 +4,10 @@ local U = require 'swi.lib.utils'
 local proxy = require 'swi.lib.proxy'
 local e = require 'swi.api.eventloop'
 
----@class swi.api.mode_text: mode_base.text
+---@class swi.api.mode_text
 ---@field _api swayimg_appmode|swayimg.gallery
 ---@field _api_name appmode_t
+
 local M = {}
 
 ---@class mode_text.tracker
@@ -171,17 +172,13 @@ local function set_text(self, x, placement)
 	end
 end
 
----@param api swayimg_appmode|swayimg.gallery
----@param name appmode_t
----@return mode_base.text
-function M.new(api, name)
-	return proxy.new {
-		_api = api,
-		_path = ('swi.%s.text'):format(name),
-		_overrides = { ['*'] = { set = set_text, get = function(self, idx) return rawget(self, '_' .. idx) or {} end } },
-
-		_api_name = name,
-	}
+---@param self swi.api.mode_text
+---@return swi.api.mode_text
+function M.new(self)
+	---@diagnostic disable: inject-field
+	self._path = ('swi.%s.text'):format(self._api_name)
+	self._overrides = { ['*'] = { set = set_text } }
+	return proxy.new(self)
 end
 
 return M

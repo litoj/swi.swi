@@ -6,26 +6,26 @@ local proxy = require 'swi.lib.proxy'
 local U = require 'swi.lib.utils'
 
 -- Paging object to manage scrollable output
----@class swi.lib.pager: proxy
+---@class swi.lib.pager.base: proxy
 ---@field mode appmode_t in which mode should we set the data
 ---@field position block_position_t where should we output to
 ---@field title string title in the non-scrollable header
 ---@field lines string[] the output to be paged
----Whether to activate or deactivate the pager.
----Configure all the preceding definition fields before enabling.
+---Activation toggle. Configure all the preceding definition fields before enabling.
 ---@field enabled boolean
 ---@field page integer
----@field page_size integer
+---@field page_size integer Readonly - useful do advance by all visible lines instead of fixed page
 ---@field total_pages integer
 ---@field line integer
-local M = {
-	_path = 'pager', ---@private
-	_overrides = {}, ---@private
-	_trigger = false, ---@private
-	_on_mode_change = function() end, ---@private
 
-	---@type mode_base.text
-	---@diagnostic disable-next-line: assign-type-mismatch
+---@class swi.lib.pager: swi.lib.pager.base
+local M = {
+	_path = 'pager',
+	_overrides = {},
+	_trigger = false,
+	_hooks = {}, ---@private
+
+	---@type mode_base.text|false
 	_mode_text = false, ---@private
 	_enabled = false, ---@private
 	---@type block_position_t
@@ -40,7 +40,7 @@ local M = {
 	_line = 1, ---@private
 	_page = 1, ---@private
 
-	_page_size = 20, ---@private
+	_page_size = 1, ---@private
 	_total_pages = 1, ---@private
 
 	---@type string[]
@@ -62,7 +62,7 @@ function M:prepare_renderer()
 	self._last_end = #self._lines
 end
 
-function M:render(force)
+function M:render(redraw_if_unchanged)
 	if not self._enabled then return end
 
 	local lines = self._lines
@@ -70,7 +70,7 @@ function M:render(force)
 	local to = math.min(#lines, from + self._page_size - 1)
 	local ls, le = self._last_start, self._last_end
 	if ls == from and le == to then
-		if force then self._mode_text[self._position] = self._last_render end
+		if redraw_if_unchanged then self._mode_text[self._position] = self._last_render end
 		return
 	end
 
@@ -116,6 +116,7 @@ function M:render(force)
 	end
 
 	self._mode_text[self._position] = out
+	-- this is faster but doesn't allow the lines to contain escape sequences
 	-- self._mode_text._api.set_text(self._position, out)
 end
 
@@ -152,7 +153,7 @@ function M:recalibrate(resize, reset)
 
 	if resize or reset then
 		self._total_pages = math.max(1, math.ceil(#self._lines / self._page_size))
-		self._page = math.floor((self._line - 1) / self._page_size) + 1
+		self._page = math.ceil((self._line - 1) / self._page_size) + 1
 	end
 
 	if reset then self:prepare_renderer() end
@@ -184,20 +185,6 @@ function M:bulk_change(applicator)
 		self.enabled = false
 	end
 end
-
-M._overrides.mode = {
-	---@param self swi.lib.pager
-	---@param mode appmode_t
-	set = function(self, mode)
-		self:_restore_original()
-		self._mode_text = swi[mode].text
-		self:_on_dst_change()
-		return false
-	end,
-	get = function(self)
-		return ({ [swi.viewer.text] = 'viewer', [swi.slideshow.text] = 'slideshow', [swi.gallery.text] = 'gallery' })[self._mode_text]
-	end,
-}
 
 M._overrides.position = {
 	---@param self swi.lib.pager
@@ -238,7 +225,7 @@ M._overrides.line = {
 		-- self._line = math.max(1, math.min(self._page_size * (self._total_pages - 1) + 1, linenr))
 		--- sets max to leave max 1 line empty at the end
 		self._line = math.max(1, math.min(#self._lines - self._page_size + 2, linenr))
-		self._page = math.floor((self._line - 1) / self._page_size) + 1
+		self._page = math.ceil((self._line - 1) / self._page_size) + 1
 		self:render()
 		return false
 	end,
@@ -253,17 +240,37 @@ M._overrides.page = {
 	end,
 }
 
+M._overrides.mode = {
+	---@param self swi.lib.pager
+	---@param mode appmode_t
+	set = function(self, mode)
+		self:_restore_original()
+		self._mode_text = swi[mode].text
+		self:_on_dst_change()
+		return false
+	end,
+	get = function(self)
+		return ({
+			[swi.viewer.text] = 'viewer',
+			[swi.slideshow.text] = 'slideshow',
+			[swi.gallery.text] = 'gallery',
+		})[self._mode_text]
+	end,
+}
+
 M._overrides.enabled = {
 	---@param self swi.lib.pager
 	set = function(self, val)
 		if val == self._enabled then return end
+		if val and not self._mode_text then self.mode = swi.mode end
 		self._enabled = val
+
 		if val then
 			self:recalibrate(true, true)
 
 			-- Listen for WinResized and OptionSet updates to recalculate per_page and re-render pager
 			local function recal(e) self:recalibrate(true, false) end
-			rawset(self, '_hooks', {
+			self._hooks = {
 				e.subscribe {
 					event = 'WinResized',
 					callback = recal,
@@ -273,9 +280,9 @@ M._overrides.enabled = {
 					pattern = { 'swi.text.size', 'swi.text.line_spacing' },
 					callback = recal,
 				},
-			})
+			}
 		else
-			for _, v in ipairs(rawget(self, '_hooks')) do
+			for _, v in ipairs(self._hooks) do
 				e.unsubscribe { id = v }
 			end
 
@@ -285,7 +292,16 @@ M._overrides.enabled = {
 	end,
 }
 
+---@param opts? swi.lib.pager.base base config
 ---@return swi.lib.pager
-function M.new() return proxy.new(U.soft_copy(M)) end
+function M.new(opts)
+	local self = proxy.new(U.soft_copy(M))
+	if opts then
+		for k, v in pairs(opts) do
+			self[k] = v
+		end
+	end
+	return self
+end
 
 return M

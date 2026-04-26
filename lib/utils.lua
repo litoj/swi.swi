@@ -15,7 +15,12 @@ function M.lazy(loader)
 	})
 end
 
+---@generic O
+---@param x `O`|`O`[]
+---@return O[]
 function M.tabled(x) return type(x) == 'table' and x or { x } end
+---@param t table
+---@return table # reverse-indexed table of t
 function M.rev_idx(t)
 	local r = {}
 	for k, v in pairs(t) do
@@ -24,7 +29,7 @@ function M.rev_idx(t)
 	return r
 end
 
----@generic O: table
+---@generic O
 ---@param t `O`
 ---@return O t copy
 function M.soft_copy(t)
@@ -86,6 +91,8 @@ M.key_map = {
 	['+'] = 'plus',
 	[','] = 'comma',
 	['.'] = 'period',
+	['['] = 'bracketleft',
+	[']'] = 'bracketright',
 }
 for _, v in ipairs { 'Middle', 'Left', 'Right' } do
 	M.key_map[v:sub(1, 1) .. 'MB'] = 'Mouse' .. v

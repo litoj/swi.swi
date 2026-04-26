@@ -5,7 +5,7 @@ local e = require 'swi.api.eventloop'
 
 local api = swayimg.gallery
 
----@type swi.gallery
+---@class swi.api.gallery: swi.gallery, swi.api.mode_base
 ---@diagnostic disable-next-line: missing-fields
 local M = {
 	_api = api,
@@ -27,6 +27,15 @@ local M = {
 	_cache_limit = 100,
 }
 
+M.text = require('swi.api.mode_text').new {
+	_api = api,
+	_api_name = 'gallery',
+	_topleft = { 'File:\t{name}' },
+	_topright = { '{list.index} of {list.total}' },
+	_bottomleft = {},
+	_bottomright = {},
+}
+
 M.go = setmetatable({}, {
 	__index = function(tbl, idx)
 		tbl[idx] = function()
@@ -38,10 +47,11 @@ M.go = setmetatable({}, {
 })
 
 M._overrides.cache_limit = {
+	---@param self swi.api.gallery
 	set = function(self, x)
 		x = math.floor(x)
 		self._api.limit_cache(x)
-		rawset(self, '_cache_limit', x)
+		self._cache_limit = x
 		return true
 	end,
 }
@@ -67,10 +77,5 @@ e.subscribe { -- ad-hoc registering for when user wants to subscribe
 }
 
 require('swi.api.mode_base').new(M, 'gallery')
-
-rawset(M.text, '_topleft', { 'File:\t{name}' })
-rawset(M.text, '_topright', { '{list.index} of {list.total}' })
-rawset(M.text, '_bottomleft', {})
-rawset(M.text, '_bottomright', {})
 
 return M

@@ -85,15 +85,55 @@ M._overrides.apply_raw_wb = {
 
 -- ensure even the default keymappings trigger our events by redefining the defaults
 _G.swi = proxy.new(M)
-require('swi.binds').default()
+
+local x
 
 swayimg.on_window_resize(function()
-	local ws = swayimg.get_window_size()
-	local ows = rawget(M, '_old_winsize')
-	if not ows or ows.width ~= ws.width or ows.height ~= ws.height then
-		-- TODO: find a way to distinguish focus events from resizing (both can happen at once)
-		e.trigger { event = 'WinResized', data = ws }
-		rawset(M, '_old_winsize', ws)
+	if x then
+		local ws = swayimg.get_window_size()
+		local ows = M._old_winsize
+		if ows.width ~= ws.width or ows.height ~= ws.height then
+			-- TODO: find a way to distinguish focus events from resizing (both can happen at once)
+			e.trigger { event = 'WinResized', data = ws }
+			---@diagnostic disable-next-line: inject-field
+			M._old_winsize = ws
+		end
+	else
+		if x == nil and not swi.overlay then
+			x = false
+			return
+		elseif x == false then
+			x = swi[swi.mode]
+			x.scale = x.default_scale -- fix incorrect initial size with overlay disabled
+		end
+		x = true
+		swi.initialized = true
+		rawset(M, '_old_winsize', swayimg.get_window_size())
+
+		e.trigger { event = 'SwiEnter' }
+
+		if e._hooks.SwiEnter then
+			e._hooks.SwiEnter = nil
+
+			-- easteregg
+			local p = io.popen 'date +%d%m' or {}
+			local o = p:read '*a'
+			p:close()
+			if o == '1003\n' then print [[Naughty, naughty! Didn't clean those hookers today...]] end
+		end
+
+		e.subscribe {
+			event = 'Subscribed',
+			pattern = 'SwiEnter',
+			-- ensure all hooks expecting initialization get loaded
+			-- (especially the lazy ones not checking swi.initialized)
+			callback = function(h)
+				h.data.callback()
+				e._hooks.SwiEnter = nil
+			end,
+		}
+
+		require('swi.binds').late_init_default()
 	end
 end)
 

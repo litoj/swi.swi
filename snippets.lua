@@ -36,8 +36,8 @@ function M.print_option_changes(enable)
 					else
 						v = ('%.2f'):format(v)
 					end
-				elseif type(v) == 'table' then -- ignore window size and position changes
-					return
+				elseif type(v) == 'table' then
+					return -- ignore window size and position changes
 				end
 
 				local name = ev.match:match '([^.]+%.[^.]+)$'
@@ -79,7 +79,7 @@ function M.cycle_values(values, current)
 end
 
 function M.cycle_scale()
-	local api = swi[swi.mode]
+	local api = swi[swi.mode] ---@type swi.viewer
 	local modes = {
 		'optimal',
 		'width',
@@ -98,7 +98,7 @@ function M.cycle_scale()
 end
 
 function M.cycle_position()
-	local api = swi[swi.mode]
+	local api = swi[swi.mode] ---@type swi.viewer
 	local modes = {
 		'center',
 		'topcenter',
