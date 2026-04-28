@@ -5,13 +5,17 @@ local M = {
 	_api = swayimg.text,
 	_path = 'swi.text',
 
+	-- settings that are not set directly in text.cpp
 	_font = 'monospace',
 	_size = 24,
 
+	--- https://github.com/artemsen/swayimg/blob/master/src/text.cpp#L22
 	_enabled = true,
 	_status_timeout = 3,
-	_line_spacing = 1,
+
+	_line_spacing = 1, -- uses a custom formula to achieve the standard meaning of the name
 	_padding = 10,
+
 	_foreground = 0xffcccccc,
 	_background = 0x00000000,
 	_shadow = 0xd0000000,

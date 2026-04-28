@@ -11,18 +11,24 @@ local M = {
 	_api = api,
 	_overrides = {},
 
+	-- settings that are not set directly in gallery.cpp
+	_embedded_thumb = true,
+	_padding_size = 5,
+
+	--- https://github.com/artemsen/swayimg/blob/master/src/gallery.cpp#L73
 	_aspect = 'fill',
 	_border_size = 5,
-	_padding_size = 5,
 	_selected_scale = 1.15,
-	_embedded_thumb = true,
+	_pinch_factor = 100.0,
 
 	_window_color = 0xff000000,
 	_background_color = 0xff202020,
 	_selected_color = 0xff404040,
 	_border_color = 0xffaaaaaa,
 
+	_hover = true,
 	_pstore = false,
+	-- _pstore_path = (os.getenv 'XDG_CACHE_HOME' or (os.getenv 'HOME' .. '/.cache')) .. '/swayimg',
 	_preload = false,
 	_cache_limit = 100,
 }

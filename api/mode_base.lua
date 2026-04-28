@@ -18,8 +18,9 @@ function M.new(self, api_name)
 	---@diagnostic disable: inject-field
 	self._path = 'swi.' .. api_name
 
+	--- https://github.com/artemsen/swayimg/blob/master/src/appmode.cpp#L11
 	self._mark_color = 0xff808080
-	self._pinch_factor = 1.0
+	if not self._pinch_factor then self._pinch_factor = 1.0 end
 
 	for _, sig in ipairs { 'USR1', 'USR2' } do
 		api.on_signal(sig, function() e.trigger { event = 'Signal', match = sig } end)

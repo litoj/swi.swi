@@ -313,7 +313,7 @@ local mode_base = {}
 ---| "keep_by_height" # keep zoom level relative to image height
 ---| "keep_by_size"   # keep zoom level relative to image overall size
 
----@class swi.viewer.step Move around the image with ready-to-map functions
+---@class swi.viewer.panner Move around the image with ready-to-map functions
 ---@field default_size integer Default size of the step to make (in pixels)
 ---@field by fun(x:integer,y:integer) Pan the image by x and y pixels in their directions
 ---@field left fun(p:integer?) Step left by `p` px (default: step.default_size)
@@ -322,9 +322,9 @@ local mode_base = {}
 ---@field up fun(p:integer?) Step up by `p` px (default: step.default_size)
 
 ---@class swi.viewer : mode_base
----Helper table for easier mappings for switching between images
+---Helper table for easier mappings for moving around the image
 ---@see swi.viewer.switch_image Equivalent via passing a parameter
----@field step swi.viewer.step Helper table for easier mappings for moving around the image
+---@field pan swi.viewer.panner
 ---Helper table for easier mappings for switching between images
 ---@see swi.viewer.switch_image Equivalent via passing a parameter
 ---@field go {[vdir_t]:function}
@@ -429,11 +429,12 @@ swi.slideshow = {}
 ---@field selected_color integer Background color for the selected thumbnail in ARGB format
 ---@field unselected_color integer Background color for unselected thumbnails in ARGB format
 ---@field window_color integer Window background color in ARGB format
----@field cache_limit integer Max number of thumbnails stored in memory cache
 ---@field preload boolean Preload invisible thumbnails
+---@field hover boolean Update image selection with mouse movement
+---@field cache_limit integer Max number of thumbnails stored in memory cache
 ---@field pstore boolean Persistent storage for thumbnails
+---@field embedded_thumb boolean Use embedded thumbnails
 ---@field pstore_path string Custom path to the directory for persistent thumbnail storage
----@field embedded_thumb boolean Use embedded thumbnails.
 swi.gallery = {}
 
 ---Select the next thumbnail from the gallery.

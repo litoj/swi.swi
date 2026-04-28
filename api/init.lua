@@ -12,6 +12,7 @@ local M = {
 	_overrides = {},
 	initialized = false,
 
+	_overlay = false, -- enabled by default in sway and disabled otherwise
 	_exif_orientation = true, -- automatically applied only to raw files
 	_antialiasing = true,
 	_decoration = true,

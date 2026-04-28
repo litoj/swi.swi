@@ -31,9 +31,9 @@ What's up with the name? You tell me:
   even if not documented yet.
 - common actions as directly mappable functions:
   ```lua
-  v.map('Right', v.go.next)
-  v.map('k', v.step.up)
-  v.map('Alt+k', function() v.step.by(70,70) end)
+  v.map('Right', v.go.next) -- image
+  v.map('k', v.pan.up)
+  v.map('Alt+k', function() v.pan.by(70,70) end)
   ```
 - **eventloop**: subscribe to any change in the api and trigger your own events for inter-module
   messaging
@@ -73,6 +73,19 @@ What's up with the name? You tell me:
     - `%m`: doesn't execute the command if no files were marked
   - `%`: unquoted current (like in 4.x): `v.map('', [[bash -c '$(which trash || echo rm) "%"']])`
 - custom **help mode** that lets you see all available keybindings or settings
+- temporary keybind mode: easily create custom modes that temporarily change the mappings
+  ```lua
+  v.map('a', function() swi.antialiasing = not swi.antialiasing end)
+  v.map('s', require'swi.snippets'.cycle_scale)
+  v.map('d', function() l.remove(l.get_current().path) end)
+  -- create a custom bind override
+  local x = require'swi.lib.bind_override'.new { mode = 'viewer' }
+  v.map('x', function() x.enabled = not x.enabled end, 'Toggle panning keybind mode')
+  x.map('a', v.pan.left, 'Pan left') -- add description to show in help mode properly
+  x.map('w', v.pan.up, 'Pan up')
+  x.map('s', v.pan.down, 'Pan down')
+  x.map('d', v.pan.right, 'Pan right')
+  ```
 
 ### New scaling modes
 
@@ -84,7 +97,7 @@ What's up with the name? You tell me:
 
 ### TODOs
 
-- temporary keybind mode - for multi-key bindings (`gm` etc.)
+- create PR to synchronize order of declaring variables/api to align with source code
 
 ### [Snippets](./snippets.lua)
 
@@ -155,7 +168,7 @@ If you're already using _lua_ls_ you only need to include the original swayimg a
 which _swi_ reuses the types:
 
 ```lua
-settings.Lua.workspace.library = {'/usr/share/swayimg/swayimg.lua'}
+settings.Lua.workspace.library = {'/usr/share/swayimg/swayimg.lua', '/usr/local/share/swayimg/swayimg.lua'}
 ```
 
 ## License

@@ -12,21 +12,22 @@ local mode_text = require 'swi.api.mode_text'
 ---@field text swi.api.mode_text
 local M = {}
 
-function M.new_step(self)
-	local step
-	step = {
+---@return swi.viewer.panner
+function M.new_panner(self)
+	local pan
+	pan = {
 		default_size = 50,
 		by = function(x, y)
 			local p = self.position
 			self.position = { x = p.x - x, y = p.y - y }
 		end,
-		left = function(p) step.by(-(p or step.default_size), 0) end,
-		right = function(p) step.by((p or step.default_size), 0) end,
-		up = function(p) step.by(0, -(p or step.default_size)) end,
-		down = function(p) step.by(0, (p or step.default_size)) end,
+		left = function(p) pan.by(-(p or pan.default_size), 0) end,
+		right = function(p) pan.by((p or pan.default_size), 0) end,
+		up = function(p) pan.by(0, -(p or pan.default_size)) end,
+		down = function(p) pan.by(0, (p or pan.default_size)) end,
 	}
 
-	return step
+	return pan
 end
 
 function M.new_go(api, api_name)
@@ -98,19 +99,17 @@ end
 ---@return swi.viewer|swi.slideshow
 function M.new(api_name)
 	local api = swayimg[api_name] ---@type swayimg.viewer
-	---@type swi.api.viewer
-	---@diagnostic disable-next-line: missing-fields
 	local self = {
 		_api = api,
 		_last = false,
 
+		--- https://github.com/artemsen/swayimg/blob/master/src/viewer.cpp#L29
 		_centering = true,
 		_loop = true,
 		_default_position = 'center',
 		_image_background = { 0xff333333, 0xff4c4c4c, size = 20 }, -- chessboard
 	}
 
-	---@diagnostic disable: inject-field
 	if api_name == 'viewer' then
 		self._default_scale = 'optimal'
 		self._window_background = 0xff000000
@@ -134,7 +133,7 @@ function M.new(api_name)
 			_bottomleft = { 'Scale: {scale}' },
 			_bottomright = {},
 		}
-	else
+	else --- https://github.com/artemsen/swayimg/blob/master/src/slideshow.cpp#L17
 		self._default_scale = 'fit'
 		self._window_background = 'auto'
 		self._history_limit = 0
@@ -147,11 +146,12 @@ function M.new(api_name)
 			_bottomright = {},
 		}
 	end
-	---@diagnostic enable: inject-field
+
+	---@cast self swi.api.viewer
 
 	self.get_abs_scale = api.get_scale
 	self.go = M.new_go(api)
-	self.step = M.new_step(self)
+	self.pan = M.new_panner(self)
 	self.scale_centered = function(s, x, y)
 		api.set_abs_scale(s, x, y)
 		rawset(self, '_scale', s)
