@@ -5,7 +5,7 @@ local backer = require 'sai.lib.backer'
 local reconfigurer = require 'sai.lib.reconfigurer'
 local U = require 'sai.lib.utils'
 
----@class sai.lib.pager: sai.lib.remapper
+---@class sai.lib.pager
 ---Activation toggle. Configure all the preceding definition fields before enabling.
 ---@field page integer
 ---@field page_size integer Readonly - useful to advance by all visible lines instead of fixed page
@@ -14,13 +14,12 @@ local U = require 'sai.lib.utils'
 -- setup options
 ---@field location block_position_t where should we output to
 ---@field title string title in the non-scrollable header
----@field lines extended_text_template[] the output to be paged (templates only render with `escaping`)
+---@field lines extended_text_template[] the output to be paged, always processed as text layer templates
 ---@field max_height number|integer max winheight to take up - 0-1 for percentage, >1 for line count
+---@field protected sai_evloop sai.lib.reconfigurer.eventloop our own hook registry, active only while enabled
+---@field protected sai_text sai.api.text our text override: writes the content through it, it restores the original blocks with itself
 local M = {
 	_trigger = false,
-
-	---Should lines be checked for sai.text escape sequences or set as pure text
-	escaping = false,
 
 	-- Live config
 	_enabled = false, ---@protected
@@ -40,10 +39,6 @@ local M = {
 	_total_pages = 1, ---@protected
 
 	-- Private state
-	---@type sai.api.mode_text|false
-	_mode_text = false, ---@private
-	---@type extended_text_template[]|false
-	_original_text = false, ---@private
 	---@type string[]
 	_last_render = {}, ---@private
 	_last_start = -1, ---@private
@@ -54,10 +49,15 @@ local M = {
 
 ---@return sai.lib.pager
 function M:new()
+	-- the pager owns the text layer: locations and the enable/disable, nothing else
+	---@diagnostic disable-next-line: assign-type-mismatch
+	self.sai_text = reconfigurer.new { super = sai.text }
+	self.sai_text.enabled = true
+
 	-- Listen for WinResized and OptionSet updates to recalculate per_page and re-render pager
 	local function recal(_) self:_recalibrate(true, false) end
-	self.eventloop = reconfigurer.new_evloop()
-	self.eventloop {
+	self.sai_evloop = reconfigurer.new_evloop()
+	self.sai_evloop {
 		{
 			event = 'WinResized',
 			callback = recal,
@@ -67,7 +67,20 @@ function M:new()
 			pattern = { 'sai.text.size', 'sai.text.line_spacing' },
 			callback = recal,
 		},
+		{
+			event = { 'ModeChangedPre', 'ModeChanged' },
+			callback = function(ev)
+				if ev.event == 'ModeChangedPre' then
+					if not self._enabled then return end
+					self.sai_text(false) -- the vars restore the blocks into the old mode
+				elseif self._enabled then
+					self:render(true)
+					self.sai_text(true) -- re-blank the new mode's blocks
+				end
+			end,
+		},
 	}
+
 	return backer.new(U.new_object(self, M))
 end
 
@@ -140,13 +153,9 @@ function M:render(redraw_if_unchanged)
 		return
 	end
 
-	if self.escaping then
-		self._mode_text[self._location] = out
-	else -- this is faster but doesn't process escape sequences
-		-- update also the cached value so that new overrides restore the text correctly
-		self._mode_text['_' .. self._location] = out
-		self._mode_text.super.text = { [self._location] = out }
-	end
+	-- the one write path: through our override, so the original block stays
+	-- tracked for the restore and the templates always get processed
+	self.sai_text[self._location] = out
 end
 
 ---@private
@@ -205,6 +214,7 @@ end
 function M:set_title(title)
 	self._title = title
 	self:render(true)
+	return false
 end
 
 ---@protected
@@ -237,6 +247,7 @@ function M:set_page(pagenr) return self:set_line((pagenr - 1) * self._page_size 
 function M:set_max_height(height)
 	self._max_height = height
 	self:_recalibrate(true, false)
+	return false
 end
 
 --- Setup handlers
@@ -252,31 +263,25 @@ end
 ---@private
 ---@param loc block_position_t
 function M:_on_dst_change(loc)
-	if self._original_text then
-		self._mode_text[self._location] = self._original_text
-		self._original_text = false
-	end
+	if loc ~= self._location then self.sai_text[self._location] = nil end
 
 	self._location = loc
 
-	if self._enabled then
-		self._mode_text = sai[sai.mode].text
-		self._original_text = self._mode_text[self._location] or false
-		self:render(true)
-	end
+	if self._enabled then self:render(true) end
 end
 
 ---@protected
 ---@param val boolean
 function M:set_enabled(val)
-	if val == self._enabled then return end
+	if val == self._enabled then return false end
 
 	if val then self:_recalibrate(true, true) end
 	self._enabled = val
-	self.eventloop(val)
-	self:_on_dst_change(self._location)
+	self.sai_evloop(val)
+	if val then self:_on_dst_change(self._location) end
+	self.sai_text(val) -- actually apply or undo all the changes
 
-	return true
+	return false
 end
 
 return M
