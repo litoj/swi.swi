@@ -16,7 +16,8 @@ local M = {
 	_path = 'sai.eventloop', ---@protected
 	debug_trigger = false,
 	debug_subscribe = false,
-} -- TODO: could improve deleting perf by having a {[hook_id]:counter}
+	ignore_opts = false, --- to not print multiple times when an option at the top gets set
+}
 
 local modes = { 'viewer', 'gallery', 'slideshow' }
 

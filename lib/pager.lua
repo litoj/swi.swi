@@ -14,10 +14,10 @@ local U = require 'sai.lib.utils'
 -- setup options
 ---@field location block_position_t where should we output to
 ---@field title string title in the non-scrollable header
----@field lines extended_text_template[] the output to be paged, always processed as text layer templates
+---@field lines extended_text_template[] the output to be paged
 ---@field max_height number|integer max winheight to take up - 0-1 for percentage, >1 for line count
----@field protected sai_evloop sai.lib.reconfigurer.eventloop our own hook registry, active only while enabled
----@field protected sai_text sai.api.text our text override: writes the content through it, it restores the original blocks with itself
+---@field protected sai_evloop sai.lib.reconfigurer.eventloop
+---@field protected sai_text sai.lib.reconfigurer.text
 local M = {
 	_trigger = false,
 
@@ -50,13 +50,15 @@ local M = {
 ---@return sai.lib.pager
 function M:new()
 	-- the pager owns the text layer: locations and the enable/disable, nothing else
+	-- a shared tree comes pre-made: the holder's cascade governs it with the pager
 	---@diagnostic disable-next-line: assign-type-mismatch
-	self.sai_text = reconfigurer.new { super = sai.text }
+	if not self.sai_text then self.sai_text = reconfigurer.new { super = sai.text } end
 	self.sai_text.enabled = true
 
-	-- Listen for WinResized and OptionSet updates to recalculate per_page and re-render pager
+	-- the page size derives from the window height and the font metrics:
+	-- recalibrate on changes of either
 	local function recal(_) self:_recalibrate(true, false) end
-	self.sai_evloop = reconfigurer.new_evloop()
+	if not self.sai_evloop then self.sai_evloop = reconfigurer.new_evloop() end
 	self.sai_evloop {
 		{
 			event = 'WinResized',
@@ -249,8 +251,6 @@ function M:set_max_height(height)
 	self:_recalibrate(true, false)
 	return false
 end
-
---- Setup handlers
 
 ---@protected
 ---@param val block_position_t

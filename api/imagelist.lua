@@ -18,7 +18,7 @@ local marked = M.marked
 local last_lsize = api.size
 
 local function set_mark(x, enabled)
-	if msize ~= marked.size() then
+	if msize ~= marked.size then
 		return -- already updated
 	end
 

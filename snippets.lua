@@ -67,9 +67,9 @@ function M.print_shell_output(timeout)
 	}
 end
 
----@param enable boolean? true by default
-function M.print_option_changes(enable)
-	if enable == false then
+---@param timeout integer|false? how long it should show the message for (s)
+function M.print_option_changes(timeout)
+	if timeout == false then
 		e.unsubscribe { event = 'OptionSet', group = 'print_var_change' }
 		return
 	end
@@ -81,6 +81,7 @@ function M.print_option_changes(enable)
 			pattern = { '!sai.imagelist.size', '!sai.text.status', '^' },
 			group = 'print_var_change',
 			callback = function(ev)
+				if e.ignore_opts then return end
 				local v = ev.data
 				if type(v) == 'number' then
 					if math.floor(v * 100) == v * 100 then
@@ -98,7 +99,8 @@ function M.print_option_changes(enable)
 						name:sub(1, 1):upper(),
 						name:sub(2):gsub('[_.](.)', function(x) return ' ' .. x:upper() end),
 						v
-					)
+					),
+					timeout
 				)
 			end,
 		}

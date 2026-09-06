@@ -35,7 +35,13 @@ local function new_input()
 		_enabled = true,
 		_prompt = false,
 		_location = 'status',
-		_raw_update = function(d) display = d end,
+		sai = {
+			text = setmetatable({}, {
+				__newindex = function(_, _, v)
+					if v ~= nil then display = v end
+				end,
+			}),
+		},
 		_text = '',
 		_col = 1,
 		_visual = false,

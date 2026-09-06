@@ -6,6 +6,8 @@ local kp = require 'sai.lib.keybind_processor'
 local backer = require 'sai.lib.backer'
 local reconfigurer = require 'sai.lib.reconfigurer'
 
+local binds = require('sai.lib.registry').binds
+
 ---Keybind override: temporarily replace keybindings and settings of the
 ---current mode. Implements the same map/unmap interface as mode_base.
 ---Supports also eventloop auto registration and deregistration +
@@ -18,7 +20,7 @@ local reconfigurer = require 'sai.lib.reconfigurer'
 ---Unbound key handler with auto-injected _self_
 ---On set() the function will get wrapped with _self_, so the value on get() will differ
 ---@field on_unassigned fun(self:sai.lib.remapper, bind:string)
----@field sai? sai.lib.reconfigurer.sai fakeapi to set changes to apply only when mode is enabled
+---@field sai? sai.lib.reconfigurer.sai settings overrides, applied while the mode is enabled
 local M = {
 	warn_on_duplicates = true, --- for keybind_processor
 	--- Filter of existing mappings for which should be kept and which disabled while mode is enabled
@@ -31,8 +33,6 @@ local M = {
 	---@type sai.api.mode_base|false
 	_mode_api = false, ---@protected
 	_enabled = false, ---@protected
-	---@type bind_map saved original mappings per mode
-	_omaps = {}, ---@private
 	---@type fun(string)|false
 	_on_unassigned = false, ---@protected
 	---@type fun(string)|false
@@ -42,14 +42,18 @@ local M = {
 ---@generic O: sai.lib.remapper
 ---@return O self
 function M:new()
-	if self._trigger == nil then self._trigger = not not self._path end
+	if self._trigger == nil then self._trigger = not not self._path and not self.sai end
 
-	self.sai = reconfigurer.new { super = sai }
+	-- a shared tree comes pre-made: only the mode-change hook below is ours
+	if not self.sai then self.sai = reconfigurer.new { super = sai } end
 	self.sai.eventloop.subscribe {
 		event = { 'ModeChangedPre', 'ModeChanged' },
 		callback = function(ev)
-			if not self.persist_mode_change then self.enabled = false end
-			if self._enabled then self:_on_mode_change(ev) end
+			if not self.persist_mode_change then
+				self.enabled = false
+			else
+				self:_on_mode_change(ev)
+			end
 		end,
 	}
 	return backer.new(kp.new(U.new_object(self, M)))
@@ -63,7 +67,7 @@ function M:_on_mode_change(ev)
 		-- disabling also unsubscribed our eventloop hooks: resubscribe so that
 		-- the following ModeChanged event still reaches us
 		self.sai.eventloop(true)
-	else -- apply keybind changes to new mode
+	else -- apply changes to new mode
 		self._enabled = false
 		M.set_enabled(self, true)
 	end
@@ -80,10 +84,12 @@ function M:_rawmap(b, cfg, fn)
 		if type(fn) == 'function' and fndbg(fn, 'u').nparams == 1 then cfg.cb = function() fn(self) end end
 	end
 
-	if self._enabled then
-		self._omaps[b] = self._mode_api._mappings[b] or false
-		self._mode_api:_setmap(b, cfg)
-	end
+	if not self._enabled then return end
+
+	-- old = false marks an originally unmapped bind, so the disable writes an
+	-- unmap back instead of skipping the restore
+	binds[self._mode_api][b]:set(self, { old = self._mode_api._mappings[b] or false, new = cfg })
+	self._mode_api:_setmap(b, cfg)
 end
 
 function M:set_on_unassigned(fn)
@@ -140,10 +146,10 @@ function M:set_enabled(val)
 			self._api_on_unassigned = false
 		end
 
-		for b, cfg in pairs(self._omaps) do -- restore original mappings
-			self._mode_api:_setmap(b, cfg)
+		for b, stack in pairs(binds[self._mode_api]) do
+			local old = stack:set(self)
+			if old ~= nil then self._mode_api:_setmap(b, old) end
 		end
-		self._omaps = {}
 
 		self.sai(val)
 	end

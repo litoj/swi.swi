@@ -48,29 +48,47 @@ function M.exit(code)
 	e.trigger(ev)
 	if not next(e.find_all(ev)) then swayimg.exit(code) end
 end
+local vars = require('sai.lib.registry').vars
+-- the message layer: the status record holds the restore, the timeout is
+-- never written through - the raw stays 0 for the display so the app's
+-- expiry (its repaint is the flicker) never fires
+---@diagnostic disable-next-line: assign-type-mismatch
+local notify_layer = require('sai.lib.reconfigurer').new { super = M.text }
+notify_layer(true)
 
-local id_gen = 0
+-- only the latest notify may release: a superseded message leaves its
+-- records to the successor
+local generation = 0
+
 function M.notify(msg, timeout)
 	msg = string.gsub(tostring(msg), '\t', '  ')
-	if not timeout then
-		if sai.text.status_timeout ~= 0 then
-			swayimg.text.status = msg
-			return
-		else
-			timeout = math.floor(#msg / 10)
-		end
-	end
+	-- the option printers must not echo our writes back as new messages
+	local muted = e.ignore_opts
+	e.ignore_opts = true
 
-	local old = sai.text.status_timeout
-	id_gen = id_gen + 1
-	local id = id_gen
-	swayimg.text.status = msg
+	local prev = M.text.status_timeout
+	if timeout == nil then timeout = prev ~= 0 and prev or -10 end
+	if timeout < 0 then timeout = math.max(1, math.floor(#msg / -timeout + 0.5)) end
+
+	generation = generation + 1
+	local mine = generation
+
+	-- the raw stays 0 for the display: the app's expiry (its repaint is
+	-- the flicker) never fires, and the publicly known value stays
+	swayimg.text.status_timeout = 0
+	vars[M.text].status_timeout:set(notify_layer, { new = prev, old = prev })
+	notify_layer.status = msg
+
 	sai.defer_fn(function()
-		-- a newer notify owns the borrow now: only its restore may act
-		if id == id_gen then swayimg.text.status = old == 0 and sai.text.status or '' end
+		if mine ~= generation then return end
+		-- TODO: the timed restore's empty status write does not repaint
+		-- (a forgotten redraw?): the message frame stays on screen until
+		-- the next one - needs a proper look someday
+		notify_layer.status = nil -- the special restores per the timeout
+		swayimg.text.status_timeout = M.text.status_timeout
 	end, timeout * 1000)
+	e.ignore_opts = muted
 end
-
 function M.log(msg, file)
 	if file then
 		local f = io.open(file, 'a') or error('Could not append to file: ' .. file)
@@ -83,27 +101,39 @@ function M.log(msg, file)
 end
 
 local deferred_heap = require 'sai.bridge.deferred_heap'
----Schedules the next callback for swayimg.defer() and reschedule itself.
-local function cb_rescheduler()
+-- one armed swayimg.defer serves the whole heap: each fire pops the earliest
+-- entry and re-arms. The flag keeps a push from arming a second fire - a
+-- surplus fire pops past the heap's end, and the error inside the app's
+-- callback kills every timer the app runs on
+local pop_scheduled = false
+
+local function schedule_pop()
+	if pop_scheduled then return end
 	local next_delay = deferred_heap:time_to_next() -- what is the earliest next cb to run
 	if next_delay == nil then return end
 
+	pop_scheduled = true
 	swayimg.defer(math.max(next_delay, 1) / 1000, function()
-		deferred_heap:pop()()
-		cb_rescheduler() -- reschedule for next callback
+		-- released before the cb: a defer_fn called inside it re-arms the
+		-- chain, this fire only finishes its own pop
+		pop_scheduled = false
+		local cb = deferred_heap:pop()
+		if cb then
+			-- one bad callback must not kill the chain for the rest
+			local ran, err = pcall(cb)
+			if not ran then print('sai deferred callback error: ' .. tostring(err)) end
+		end
+		schedule_pop()
 	end)
 end
+
 function M.defer_fn(cb, ms)
 	if type(cb) == 'integer' then
 		cb, ms = ms, cb
 	end
 	ms = ms or 1
 	deferred_heap:push(ms, cb)
-	if #deferred_heap == 1 then
-		swayimg.defer(math.max(ms, 1) / 1000, function() deferred_heap:pop()() end)
-	else
-		cb_rescheduler()
-	end
+	schedule_pop()
 end
 
 --- for bw compatibility and ease of use

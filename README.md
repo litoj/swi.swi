@@ -94,8 +94,10 @@ https://github.com/user-attachments/assets/5b1e5b56-7f84-4525-b490-6ff0ff6a30be
 ### Custom modes
 
 - temporary changes to the api through `sai.lib.remapper` instances - see `snippets.two_pane_mode`
-- variable changes, with the option to let the user adjust them
-- automatic event subscriptions and deletions
+- variable changes, event hooks and mappings overrides
+  - applied only while the mode is active
+  - clever state restoring by deciding what to override and what to keep based on active modes order
+  - variables can get updated back by how the user changes the environment while active
 - custom keybinds, automatically listed in a **key help mode** tab (no control keybinds;
   <kbd>F1</kbd> gives the full mode)
 
@@ -311,15 +313,6 @@ luajit tests/init.lua debug.breakpoints   # one method
 
 ### TODOs
 
-- way to fake partially enabled text layer (disable all besides the active one)
-  - when disabled, enable text layer but hide all textfield layers with `{}`
-  - pass sai faker (or real) to every component (or it creates its own reconfigurer by default)
-    - that way one mode puts all its overrides into just one place that gets applied at once in the
-      right order
-  - use active_modes to determine which mode is above which other one and on disable of a mid-mode,
-    if a mode above has changed the same var, then don't restore it, but set the backed value to the
-    mode backer above
-- clever state restoring by deciding what to override and what to keep based on active modes order
 - make input mode into a simple utils function for requesting user input
 - unify pager and input mode
 - generalize completion in filter mode and filter mode itself (for filtering of any content)

@@ -68,6 +68,7 @@ function M:new()
 	}
 	self._images = {}
 	self._loaded_tags = { index = true, path = true, size = true, mtime = true, mark = true }
+
 	M.super.new(self)
 	binds.filter(self)
 
@@ -341,7 +342,6 @@ function M:set_enabled(val) -- TODO: better handling of mode switching
 	if val then
 		M.super.set_enabled(self, true)
 
-		-- Snapshot the full image list before filtering
 		local imap = self._images
 		local ilist = l.get() ---@type imgmeta[]
 		local to_get = {}

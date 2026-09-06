@@ -2,10 +2,12 @@
 
 local U = require 'sai.lib.utils'
 local help = require 'sai.mode.help'
+local vars = require('sai.lib.registry').vars
 
 ---Variable help overlay: all live-settable options plus, for each active custom
 ---mode, the mode's own variables and the sai settings it currently overrides.
----TODO: in the future: add ways to select a variable and list help and its possible values
+---TODO: in the future: add ways to select a variable and:
+--- toggle it, see its possible values, see the help for its meaning (from the docs)
 ---@class sai.mode.var_help: sai.mode.help
 local M = { _path = 'sai.mode.var_help' }
 
@@ -74,16 +76,18 @@ function M:varset_lines(mode)
 	-- Swayimg/Sai opt overrides: the reconfigurer does not fire events on
 	-- changes, so the lines are fixed strings of the overridden values
 	local overrides = {}
-	for name, v in pairs(rawget(mode.sai, '_vars') or {}) do
-		overrides[name] = v.new
+	for name, stack in pairs(vars[rawget(mode.sai, 'super')]) do
+		local v = stack[mode.sai]
+		if v then overrides[name] = v.new end
 	end
 	for name, sub in pairs(mode.sai) do
 		-- sub-reconfigurers (sai.text, ...) carry their own overrides;
 		-- rawget: their sibling fields error on unknown keys
-		local subvars = type(sub) == 'table' and rawget(sub, '_vars')
-		if subvars then
-			for k, v in pairs(subvars) do
-				overrides[('%s.%s'):format(name, k)] = v.new
+		local super = type(sub) == 'table' and rawget(sub, 'super')
+		if super then
+			for k, stack in pairs(vars[super]) do
+				local v = stack[sub]
+				if v then overrides[('%s.%s'):format(name, k)] = v.new end
 			end
 		end
 	end

@@ -7,7 +7,7 @@ local binds = require('sai.binds').help
 ---Fully generated tab.
 ---@class help_tab
 ---@field title string
----@field lines extended_text_template[] values can be text layer templates (see README)
+---@field lines extended_text_template[]
 ---Tab generator: called on activation and on every mode change; generates
 ---all tabs straight-up - return a fresh list to add or remove tabs.
 ---@alias help_tabs fun(self:sai.mode.help):help_tab[]
@@ -31,20 +31,25 @@ local M = {
 
 ---Create an instance (see sai.mode.key_help / sai.mode.var_help) by calling
 ---`help.new { _path = ..., tabs = ... }` - the passed table becomes the instance.
----@generic O: table
----@param self `O` partially filled instance table: the missing fields are copied in from the module
----@return O
+---@param self sai.mode.help
+---@return sai.mode.help
 function M:new()
 	U.new_object(self, M)
-	---@cast self sai.mode.help
-	self.pager = pager.new {
-		_path = self._path .. '.pager',
-		_trigger = true,
-		_location = 'topleft',
-	}
-
-	M.super.new(self)
+	M.super.new(self) -- the sai tree first: the pager writes through it
 	binds(self)
+
+	-- the pager writes through the mode's own text tree: one shared layer,
+	-- so the mode's takeover does not blank its own header
+	rawset(
+		self,
+		'pager',
+		pager.new {
+			_path = self._path .. '.pager',
+			_trigger = true,
+			_location = 'topleft',
+			sai_text = self.sai.text,
+		}
+	)
 
 	self.sai.eventloop.subscribe {
 		event = 'User',

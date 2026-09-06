@@ -21,20 +21,15 @@ function M.__index(self, idx)
 	error('tried to get: ' .. self._path .. '.' .. idx)
 end
 
-local trig = e.trigger
-local function spoof_trigger(ev)
-	if ev.event ~= 'OptionSet' then return trig(ev) end
-end
-
 function M.__newindex(self, idx, val)
 	local old = rawget(self, '_' .. idx)
 
-	local ot = e.trigger
-	e.trigger = spoof_trigger
+	local oio = e.ignore_opts
+	e.ignore_opts = true
 	local res = rawget(self, 'set_' .. idx)
 	if not res then error('tried to set ' .. self.path .. '.' .. idx) end
 	res = res(self, val, idx)
-	e.trigger = ot
+	e.ignore_opts = oio
 
 	if res == nil then -- set the field only if the setter allows it
 		rawset(self, '_' .. idx, val)

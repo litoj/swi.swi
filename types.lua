@@ -84,7 +84,7 @@ function sai.defer_fn(cb, ms) end
 
 ---Show status message for the duration of `sai.text.status_timeout` seconds.
 ---@param msg string
----@param timeout integer? how many seconds to display the message for
+---@param timeout integer? how many seconds to display the message for (<0 for #msg/-t)
 function sai.notify(msg, timeout) end
 
 ---Print a message on-screen and to the terminal.
@@ -380,6 +380,8 @@ end
 ---and how long for (after switching to a different image).
 ---Use `true` to disable timeout and permanently display, `false` to always hide, x for x seconds
 ---@field enabled boolean|number
+---Msg in the middle, use only via sai.lib.reconfigurer.text for permanent msg display
+---@field status string
 ---@field status_timeout number Timeout in seconds after which the status message is hidden
 ---@field font string Font face name
 ---@field size integer Font size in pixels

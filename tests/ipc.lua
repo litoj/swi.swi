@@ -111,6 +111,10 @@ end
 
 local T = {}
 
+-- ---------------------------------------------------------------------------
+-- Generic unit tests
+-- ---------------------------------------------------------------------------
+
 T.config = scenario(function()
 	-- serving is exercised end-to-end by the poll_driven/signal_driven
 	-- scenarios below; here only the config semantics
@@ -127,6 +131,10 @@ T.config = scenario(function()
 	ok('client empty path', not pcall(function() ipc.client '' end))
 	ok('path too long', not pcall(function() ipc.server(string.rep('a', 108)) end))
 end)
+
+-- ---------------------------------------------------------------------------
+-- Usability tests: a client and a server process over the unix socket
+-- ---------------------------------------------------------------------------
 
 T.poll_driven = scenario(function()
 	-- no O_ASYNC: the main loop polls the socket itself

@@ -19,7 +19,6 @@ local binds = require 'sai.binds'
 ---@field protected confirmed boolean? has input been confirmed or aborted, useful for disabling logic
 local M = {
 	super = require 'sai.lib.remapper',
-	_trigger = false, -- disable trigger to ensure text is visible even when set to `status`
 	map_filter = function(b)
 		return not b:find '%u[%l%d]*$' and not b:find('Ctrl', 1, true) and not b:find('Alt', 1, true)
 	end,
@@ -46,8 +45,6 @@ local M = {
 	-- that would be just for the `status` location
 	-- TODO: convert to using lines and pager and create a textbox for line scrolling
 	-- Private state
-	---@type fun(lines:string[])|fun(status:string)|false
-	_raw_update = false, ---@private armed writer: block renders go through our sai.text override
 }
 setmetatable(M, { __index = M.super })
 
@@ -124,13 +121,13 @@ function M:render()
 	end
 
 	if self._location == 'status' then
-		self._raw_update(self._prompt and self._prompt .. display or display)
+		self.sai.text[self._location] = self._prompt and self._prompt .. display or display
 	else
 		local lines = { self._prompt }
 		for l in display:gmatch '([^\n]*)\n?' do
 			lines[#lines + 1] = l
 		end
-		self._raw_update(lines)
+		self.sai.text[self._location] = lines
 	end
 end
 
@@ -184,7 +181,7 @@ end
 function M:confirm(text)
 	rawset(self, 'confirmed', text ~= false)
 	if text == false then self.text = '' end
-	if self:on_confirm(text ~= false and (text or self._text) or false) ~= false then self:set_enabled(false) end
+	if self:on_confirm(text ~= false and (text or self._text) or false) ~= false then self.enabled = false end
 end
 
 ---This is an alias to the preferred `self:confirm(false)`
@@ -283,36 +280,12 @@ end
 ---@private
 ---@param loc block_position_t|'status'
 function M:_on_dst_change(loc)
-	if self._raw_update then
-		if self._location == 'status' then
-			self.sai.text.status = nil
-			self.sai.text.status_timeout = nil
-		else
-			-- the var's restore puts the original block back
-			self.sai.text[self._location] = nil
-			self.sai.text.enabled = nil
-		end
-	end
+	-- releasing the location retires the defaults its write armed (the status
+	-- pin, the text layer): the tree does that on its own
+	self.sai.text[self._location] = nil
 
 	self._location = loc
-
-	if self._enabled then
-		if self._location == 'status' then
-			-- take the status over: permanent for us, restored on disable
-			-- only when it was permanent before (see the sai.text special)
-			self.sai.text.status_timeout = 0
-			self.sai.text.status = ''
-			self._raw_update = function(x) sai.text.status = x end
-		else
-			-- blanks the blocks when the layer was off (see the sai.text
-			-- special); our writes go through the same override, so the
-			-- original block stays tracked for the restore
-			self.sai.text.enabled = true
-			self._raw_update = function(lines) self.sai.text[self._location] = lines end
-		end
-
-		self:render()
-	end
+	if self._enabled then self:render() end
 end
 
 ---@private
@@ -326,15 +299,14 @@ function M:set_enabled(val)
 		M.super.set_enabled(self, val)
 		self:_on_dst_change(self._location)
 		rawset(self, 'confirmed', nil)
+		return self._location ~= 'status'
 	else
-		self._enabled = false -- fake the disable to make _on_dst_change skip the re-arm
+		self._enabled = false -- fake the disable to make the re-render skip
 		self:_on_dst_change(self._location)
 		self._enabled = true
-		self._raw_update = false
 		M.super.set_enabled(self, val)
+		return true
 	end
-
-	return false
 end
 
 return M
